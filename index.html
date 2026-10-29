@@ -1,0 +1,2419 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Plataforma Educativa (Fix)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden-by-default {
+            display: none;
+        }
+        .card {
+            perspective: 1000px;
+        }
+        .card-inner {
+            position: relative;
+            width: 240px;
+            height: 140px;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card:hover .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            padding: 0.75rem;
+            box-sizing: border-box;
+        }
+        .card-front {
+            background-color: #059669;
+            color: white;
+        }
+        .card-back {
+            background-color: #b91c1c;
+            color: white;
+            transform: rotateY(180deg);
+        }
+        .draggable {
+            cursor: grab;
+            background-color: #dbeafe;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            margin: 0.25rem;
+            display: inline-block;
+            user-select: none;
+        }
+        .dropzone {
+            border: 2px dashed #94a3b8;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            min-height: 50px;
+            transition: border-color 0.25s, background-color 0.25s;
+        }
+        .btn-file {
+            background: #2563eb;
+            color: white;
+            padding: .4rem .75rem;
+            border-radius: .4rem;
+            cursor: pointer;
+        }
+        pre.map {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        }
+        .link-img {
+            color: #1d4ed8;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-6xl mx-auto p-6">
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-indigo-600">Plataforma Educativa Interactiva</h1>
+            <p class="text-sm text-gray-600 mt-2">
+                Recursos sobre <strong>cualquier contenido educativo, que desees agregar</strong>. Incluye quizzes secuenciales, glosario, flashcards, estructuras (imágenes via links), casos y actividades interactivas. Progreso guardado localmente.
+            </p>
+
+            <nav class="mt-4 flex flex-wrap gap-2">
+                <button class="btn" data-target="home">Inicio</button>
+                <button class="btn" data-target="quiz">Quiz</button>
+                <button class="btn" data-target="gloss">Glosario</button>
+                <button class="btn" data-target="flash">Flashcards</button>
+                <button class="btn" data-target="estructuras">Estructuras</button>
+                <button class="btn" data-target="casos">Casos</button>
+                <button class="btn" data-target="interactivo">Interactivo</button>
+                <button class="btn" data-target="map">Mapas</button>
+                <button class="btn" data-target="dash">Dashboard</button>
+                <label class="btn-file ml-2">
+                    Importar contenido (JSON)
+                    <input id="fileInput" type="file" accept="application/json" style="display:none">
+                </label>
+                <button id="exportJSON" class="btn">Exportar contenido</button>
+            </nav>
+        </header>
+
+        <!-- Home -->
+        <section id="home" class="bg-white p-5 rounded shadow">
+            <h2 id="homeTitle" class="text-xl font-semibold mb-2">Bienvenido</h2>
+
+            <p id="homeDescription" class="text-sm text-gray-700">
+                La plataforma está diseñada para estudiar y practicar los tres bloques fundamentales:
+                <strong>Endomembrana</strong> (síntesis, procesamiento y tráfico de proteínas/lípidos),
+                <strong>Estructuras y Procesos</strong> (ribosomas, lisosomas, RE, Golgi y mecanismos moleculares)
+                y <strong>Mitocondrias y Metabolismo – Plastidios y Cloroplastos</strong> (bioenergética, ATP, fotosíntesis).
+                Usa las herramientas interactivas para autoevaluación.
+            </p>
+
+            <details class="mt-4">
+                <summary class="cursor-pointer font-semibold">
+                    Editar contenido de Inicio (JSON)
+                </summary>
+
+                <textarea id="homeJSON"
+                    style="width:100%;height:160px"
+                    class="mt-2 border rounded p-2 font-mono text-sm">
+                    {
+                    "title": "Bienvenido",
+                    "description": "Texto de introducción editable desde JSON."
+                    }
+                </textarea>
+
+                <div class="mt-2 flex gap-2">
+                    <button id="loadHomeJSON" class="px-3 py-1 bg-green-600 text-white rounded">
+                        Cargar Inicio
+                    </button>
+                    <button id="exportHomeJSON" class="px-3 py-1 bg-gray-600 text-white rounded">
+                        Exportar Inicio
+                    </button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Quiz -->
+        <section id="quiz" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Quiz (secuencial por tema)</h2>
+            <div class="flex gap-3 mb-3">
+                <button id="prevQ" class="px-3 py-1 bg-gray-500 text-white rounded">Anterior</button>
+                <button id="nextQ" class="px-3 py-1 bg-indigo-600 text-white rounded">Siguiente</button>
+                <button id="showAll" class="px-3 py-1 bg-gray-600 text-white rounded">Mostrar preguntas (JSON)</button>
+                <select id="quizTopic" class="rounded border px-2"></select>
+            </div>
+
+            <div id="quizArea">
+                <p id="qText" class="font-medium mb-2">
+                    Cargando pregunta...
+                </p>
+                <div id="qOptions" class="space-y-2 mb-3"></div>
+                <button id="checkA" class="px-3 py-1 bg-amber-500 text-white rounded">Verificar</button>
+                <p id="qResult" class="mt-2 text-sm"></p>
+                <p class="text-xs text-gray-500 mt-2">
+                    Pregunta <span id="qNumber">0</span> de <span id="qTotal">0</span>
+                </p>
+            </div>
+
+            <details class="mt-4">
+                <summary class="cursor-pointer">Ver/Editar inventario de preguntas (JSON)</summary>
+                <textarea id="questionsJSON" style="width:100%;height:200px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadQuestions" class="px-3 py-1 bg-green-600 text-white rounded">Cargar preguntas desde JSON</button>
+                </div>
+            </details>
+            <details class="mt-4">
+                <summary class="cursor-pointer">Ver/Editar bloques del quiz (JSON)</summary>
+                <textarea id="quizTopicsJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadQuizTopics" class="px-3 py-1 bg-green-600 text-white rounded">Cargar bloques desde JSON</button>
+                    <button id="exportQuizTopics" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar bloques</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Glosario -->
+        <section id="gloss" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Glosario (términos técnicos)</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <input id="glossSearch" placeholder="Buscar término..." class="w-full p-2 border rounded mb-3" />
+                    <div id="glossList" style="max-height:420px;overflow:auto"></div>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Agregar/editar término</h3>
+                    <input id="termInput" placeholder="Término" class="w-full p-2 border rounded mb-2" />
+                    <textarea id="defInput" placeholder="Definición" class="w-full p-2 border rounded mb-2" style="height:160px"></textarea>
+                    <div class="flex gap-2">
+                        <button id="addTerm" class="px-3 py-1 bg-green-600 text-white rounded">Agregar término</button>
+                        <button id="clearGloss" class="px-3 py-1 bg-red-500 text-white rounded">Borrar todo</button>
+                    </div>
+                </div>
+            </div>
+
+            <details class="mt-4">
+                <summary>Exportar/Importar glosario (JSON)</summary>
+                <textarea id="glossJSON" style="width:100%;height:140px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="importGloss" class="px-3 py-1 bg-blue-600 text-white rounded">Importar glosario</button>
+                    <button id="exportGloss" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar glosario</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Flashcards -->
+        <section id="flash" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Flashcards (giran al hacer hover o clic)</h2>
+            <div class="flex flex-wrap gap-4" id="flashContainer" style="min-height:160px"></div>
+
+            <details class="mt-4">
+                <summary>Administrar flashcards (JSON)</summary>
+                <textarea id="flashJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadFlash" class="px-3 py-1 bg-green-600 text-white rounded">Cargar flashcards</button>
+                    <button id="exportFlash" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar flashcards</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Estructuras -->
+        <section id="estructuras" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Estructuras: identificación (imágenes como links)</h2>
+            <p class="text-sm text-gray-700 mb-3">
+                Haz clic en el enlace para abrir la imagen en nueva pestaña y luego elige la opción correcta.
+            </p>
+
+            <div id="structuresArea" class="space-y-4"></div>
+
+            <details class="mt-4">
+                <summary>Administrar estructuras (JSON)</summary>
+                <textarea id="structuresJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadStructures" class="px-3 py-1 bg-green-600 text-white rounded">Cargar estructuras</button>
+                    <button id="exportStructures" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar estructuras</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Casos -->
+        <section id="casos" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Casos de análisis (escenarios clínico/experimentales)</h2>
+            <div id="casesArea"></div>
+
+            <details class="mt-4">
+                <summary>Administrar casos (JSON)</summary>
+                <textarea id="casesJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadCases" class="px-3 py-1 bg-green-600 text-white rounded">Cargar casos</button>
+                    <button id="exportCases" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar casos</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Interactivo -->
+        <section id="interactivo" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Interactivo: arrastra y suelta / completar</h2>
+            <p class="text-sm mb-3">
+                Ejercicios arrastrar-soltar y completar. Los ejercicios se cargan desde JSON (50 ítems) para mantener compatibilidad.
+            </p>
+
+            <div id="interactiveArea" class="space-y-4"></div>
+
+            <details class="mt-4">
+                <summary>Administrar interactivos (JSON)</summary>
+                <textarea id="interJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadInter" class="px-3 py-1 bg-green-600 text-white rounded">Cargar interactivos</button>
+                    <button id="exportInter" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar interactivos</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Mapas -->
+        <section id="map" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Mapas conceptuales</h2>
+            <div id="mapsDisplay" class="grid grid-cols-1 gap-4 mb-3"></div>
+
+            <details class="mt-4">
+                <summary>Administrar mapas (JSON)</summary>
+                <textarea id="mapsJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadMaps" class="px-3 py-1 bg-green-600 text-white rounded">Cargar mapas</button>
+                    <button id="exportMaps" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar mapas</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Dashboard -->
+        <section id="dash" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Dashboard de progreso</h2>
+
+            <p class="text-sm">
+                Puntaje total:
+                <span id="score">0</span> /
+                <span id="maxScore">0</span>
+            </p>
+
+            <p class="text-sm mt-1">
+                Progreso general:
+                <span id="scorePercent">0%</span>
+            </p>
+
+            <button id="reset" class="mt-2 px-3 py-1 bg-red-500 text-white rounded">
+                Reiniciar progreso
+            </button>
+
+            <div class="mt-4">
+                <h3 class="font-semibold">Progreso por sección</h3>
+                <ul class="list-disc ml-6 text-sm">
+                    <li>Quiz: <span id="progressQuiz" class="font-semibold text-blue-600">0 / 0 - 0%</span></li>
+                    <li>Glosario: <span id="progressGloss" class="font-semibold text-green-600">0 / 0 - 0%</span></li>
+                    <li>Flashcards: <span id="progressFlash" class="font-semibold text-purple-600">0 / 0 - 0%</span></li>
+                    <li>Estructuras: <span id="progressStructures" class="font-semibold text-indigo-600">0 / 0 - 0%</span></li>
+                    <li>Casos: <span id="progressCases" class="font-semibold text-red-600">0 / 0 - 0%</span></li>
+                    <li>Interactivo: <span id="progressInteractive" class="font-semibold text-amber-600">0 / 0 - 0%</span></li>
+                    <li>Mapas: <span id="progressMaps" class="font-semibold text-teal-600">0 / 0 - 0%</span></li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function normalizeText(value) {
+            return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+        }
+
+        /* --------------------------
+  ESTRUCTURA DE DATOS (DB) - muestra mínima inicial para pruebas.
+  Reemplaza con tu JSON grande importándolo.
+-------------------------- */
+        let DB = {
+            "quizTopics": [{
+                "value": "entropia",
+                "label": "1) Segunda ley y entropía"
+            },
+                {
+                    "value": "energias_libres",
+                    "label": "2) Energías libres y espontaneidad"
+                },
+                {
+                    "value": "potencial_quimico",
+                    "label": "3) Potencial químico y equilibrio"
+                },
+                {
+                    "value": "equilibrio_gaseoso",
+                    "label": "4) Equilibrio gaseoso y ejercicios"
+                },
+                {
+                    "value": "formato_examen",
+                    "label": "5) Cálculos y errores críticos"
+                }],
+            "questions": [{
+                "id": "q1",
+                "topic": "entropia",
+                "text": "¿Qué diferencia fundamental existe entre la primera y la segunda ley de la termodinámica?",
+                "options": [
+                    "La primera determina la espontaneidad y la segunda conserva la energía.",
+                    "La primera conserva la energía y la segunda establece la dirección de los procesos espontáneos.",
+                    "Ambas establecen exclusivamente la conservación de la energía.",
+                    "La segunda indica que la entropía siempre disminuye en un sistema aislado."
+                ],
+                "answer": 1,
+                "explain": "La primera ley expresa la conservación de la energía; la segunda determina la dirección de los procesos mediante la variación de entropía del universo. En un proceso espontáneo irreversible, ΔS_universo > 0."
+            },
+                {
+                    "id": "q2",
+                    "topic": "entropia",
+                    "text": "Un proceso presenta ΔS_sistema = −5 J/K y ΔS_entorno = +8 J/K. ¿Cuál es la conclusión correcta?",
+                    "options": [
+                        "Es imposible porque la entropía del sistema disminuye.",
+                        "Es reversible porque las entropías tienen signos opuestos.",
+                        "Es espontáneo e irreversible porque ΔS_universo = +3 J/K.",
+                        "No puede evaluarse sin conocer la energía interna."
+                    ],
+                    "answer": 2,
+                    "explain": "ΔS_universo = ΔS_sistema + ΔS_entorno = −5 + 8 = +3 J/K. Como la entropía total aumenta, el proceso es compatible con la segunda ley y es irreversible."
+                },
+                {
+                    "id": "q3",
+                    "topic": "entropia",
+                    "text": "¿Qué establece el principio de Kelvin–Planck?",
+                    "options": [
+                        "Una máquina térmica cíclica no puede convertir íntegramente en trabajo el calor recibido de un único depósito.",
+                        "Toda máquina térmica puede convertir el calor en trabajo con eficiencia del 100 %.",
+                        "La entropía de cualquier sistema disminuye durante un ciclo.",
+                        "El trabajo se transforma siempre íntegramente en calor."
+                    ],
+                    "answer": 0,
+                    "explain": "Kelvin–Planck expresa una restricción de la segunda ley: una máquina térmica que opera en ciclo no puede extraer calor de un único depósito y transformarlo completamente en trabajo."
+                },
+                {
+                    "id": "q4",
+                    "topic": "entropia",
+                    "text": "¿Qué relación expresa la ecuación de Boltzmann?",
+                    "options": [
+                        "ΔG = ΔH − TΔS",
+                        "PV = nRT",
+                        "ΔS = q/T para cualquier proceso irreversible",
+                        "S = k_B ln Ω"
+                    ],
+                    "answer": 3,
+                    "explain": "La ecuación de Boltzmann relaciona la entropía con el número de microestados accesibles: S = k_B ln Ω. Un número mayor de microestados corresponde a una entropía mayor."
+                },
+                {
+                    "id": "q5",
+                    "topic": "entropia",
+                    "text": "¿Cuál es el criterio correcto para la variación de entropía del universo?",
+                    "options": [
+                        "ΔS_universo < 0 para todo proceso espontáneo.",
+                        "ΔS_universo = 0 para todo proceso irreversible.",
+                        "ΔS_universo > 0 en procesos espontáneos irreversibles y = 0 en procesos reversibles ideales.",
+                        "ΔS_universo depende exclusivamente de la temperatura del sistema."
+                    ],
+                    "answer": 2,
+                    "explain": "El criterio universal es ΔS_universo ≥ 0. La igualdad corresponde al límite reversible ideal; una variación positiva caracteriza los procesos irreversibles espontáneos."
+                },
+                {
+                    "id": "q6",
+                    "topic": "entropia",
+                    "text": "¿Qué afirmación describe correctamente un proceso adiabático?",
+                    "options": [
+                        "La entropía siempre es cero.",
+                        "No existe transferencia de calor; si el proceso es reversible es isentrópico, pero si es irreversible la entropía puede aumentar.",
+                        "La temperatura permanece necesariamente constante.",
+                        "La energía interna siempre permanece constante."
+                    ],
+                    "answer": 1,
+                    "explain": "En un proceso adiabático, q = 0. Si además es reversible, ΔS = 0; si es irreversible, la entropía del sistema puede aumentar. En una expansión libre adiabática de un gas ideal, ΔU = 0 y ΔS > 0."
+                },
+                {
+                    "id": "q7",
+                    "topic": "entropia",
+                    "text": "Se vaporizan reversiblemente 0,50 mol de etanol a 351,45 K. Si ΔH_vap = 39,3 kJ/mol, ¿cuál es la variación de entropía?",
+                    "options": [
+                        "−55,9 J/K",
+                        "111,8 J/K",
+                        "55,9 J/K",
+                        "19,65 J/K"
+                    ],
+                    "answer": 2,
+                    "explain": "ΔS = q_rev/T = nΔH_vap/T. ΔS = (0,50 mol × 39 300 J/mol)/351,45 K ≈ 55,9 J/K. La vaporización aumenta la entropía del sistema."
+                },
+                {
+                    "id": "q8",
+                    "topic": "entropia",
+                    "text": "Dos moles de Cl₂ se calientan a presión constante desde 300 K hasta 400 K. Si Cp,m = 31 J mol⁻¹ K⁻¹, ¿cuánto cambia su entropía?",
+                    "options": [
+                        "17,8 J/K",
+                        "20,7 J/K",
+                        "62,0 J/K",
+                        "−17,8 J/K"
+                    ],
+                    "answer": 0,
+                    "explain": "Para Cp,m constante, ΔS = nCp,m ln(T₂/T₁) = 2 × 31 × ln(400/300) ≈ 17,8 J/K. Las temperaturas se expresan en kelvin."
+                },
+                {
+                    "id": "q9",
+                    "topic": "entropia",
+                    "text": "¿Qué signo presenta la variación de entropía del sistema durante una condensación?",
+                    "options": [
+                        "Siempre es positiva porque se libera calor.",
+                        "Es cero porque no cambia la composición química.",
+                        "Depende únicamente de la presión y nunca del estado físico.",
+                        "Es negativa porque el vapor pasa a un estado líquido generalmente más ordenado."
+                    ],
+                    "answer": 3,
+                    "explain": "Durante la condensación disminuye la entropía del sistema: ΔS_cond = −ΔH_vap/T para la transición reversible a la misma temperatura. El entorno puede ganar entropía al recibir el calor liberado."
+                },
+                {
+                    "id": "q10",
+                    "topic": "entropia",
+                    "text": "¿Qué establece la tercera ley de la termodinámica para un cristal perfecto en su estado fundamental no degenerado?",
+                    "options": [
+                        "Su entropía es infinita a 0 K.",
+                        "Su entropía tiende a cero cuando T tiende a 0 K.",
+                        "Su energía interna debe ser cero a cualquier temperatura.",
+                        "Su capacidad calorífica permanece constante hasta 0 K."
+                    ],
+                    "answer": 1,
+                    "explain": "Para un cristal perfecto con estado fundamental no degenerado, S → 0 cuando T → 0 K. Este principio permite establecer entropías absolutas a partir de las contribuciones térmicas y de las transiciones de fase."
+                },
+                {
+                    "id": "q11",
+                    "topic": "entropia",
+                    "text": "A bajas temperaturas, si Cp,m = aT³ según el modelo de Debye, ¿qué expresión se obtiene para la entropía molar desde 0 K?",
+                    "options": [
+                        "S_m = aT³/3",
+                        "S_m = a/T³",
+                        "S_m = 3aT",
+                        "S_m = a ln T"
+                    ],
+                    "answer": 0,
+                    "explain": "S_m(T) = ∫₀ᵀ (Cp,m/T)dT = ∫₀ᵀ aT² dT = aT³/3. La expresión corresponde al comportamiento de baja temperatura indicado por el modelo de Debye."
+                },
+                {
+                    "id": "q12",
+                    "topic": "entropia",
+                    "text": "Un líquido tiene ΔH_vap = 30,0 kJ/mol y hierve a 350 K. ¿Qué valor de entropía molar de vaporización se obtiene y cómo se interpreta?",
+                    "options": [
+                        "8,57 J mol⁻¹ K⁻¹; valor necesariamente anómalo.",
+                        "105 J mol⁻¹ K⁻¹; valor superior al intervalo normal.",
+                        "85,7 J mol⁻¹ K⁻¹; valor compatible con la regla de Trouton para líquidos normales no asociados.",
+                        "−85,7 J mol⁻¹ K⁻¹; la vaporización disminuye la entropía."
+                    ],
+                    "answer": 2,
+                    "explain": "ΔS_vap = ΔH_vap/T_b = 30 000/350 = 85,7 J mol⁻¹ K⁻¹. La regla de Trouton sitúa aproximadamente la entropía molar de vaporización de líquidos normales no asociados en 85–88 J mol⁻¹ K⁻¹. El agua y el etanol presentan desviaciones relacionadas con los puentes de hidrógeno."
+                },
+                {
+                    "id": "q13",
+                    "topic": "energias_libres",
+                    "text": "¿Qué criterio de espontaneidad corresponde a la energía libre de Gibbs?",
+                    "options": [
+                        "A volumen y temperatura constantes, ΔG siempre debe ser positiva.",
+                        "A presión y temperatura constantes, ΔG < 0 indica un proceso espontáneo en la dirección considerada.",
+                        "A presión y temperatura constantes, ΔG = 0 indica una reacción irreversible.",
+                        "A presión constante, ΔG depende únicamente de ΔH."
+                    ],
+                    "answer": 1,
+                    "explain": "A temperatura y presión constantes, ΔG < 0 indica espontaneidad, ΔG = 0 equilibrio y ΔG > 0 que la dirección considerada no es espontánea. Gibbs permite analizar procesos químicos y trabajo útil no expansivo."
+                },
+                {
+                    "id": "q14",
+                    "topic": "energias_libres",
+                    "text": "¿Cuál es el criterio de espontaneidad para la energía libre de Helmholtz?",
+                    "options": [
+                        "A temperatura y volumen constantes, ΔA < 0 indica espontaneidad.",
+                        "A presión y temperatura constantes, ΔA siempre es cero.",
+                        "A temperatura y volumen constantes, ΔA > 0 indica espontaneidad directa.",
+                        "Helmholtz se define como A = H + TS."
+                    ],
+                    "answer": 0,
+                    "explain": "La energía de Helmholtz se define como A = U − TS. A temperatura y volumen constantes, ΔA < 0 indica un proceso espontáneo; ΔA = 0 corresponde al equilibrio."
+                },
+                {
+                    "id": "q15",
+                    "topic": "energias_libres",
+                    "text": "¿Cuál afirmación describe el trabajo máximo reversible?",
+                    "options": [
+                        "A presión constante, el trabajo útil máximo es siempre ΔH.",
+                        "A temperatura y volumen constantes, el trabajo máximo es ΔG.",
+                        "El trabajo máximo es independiente de las restricciones termodinámicas.",
+                        "A temperatura y presión constantes, el trabajo útil máximo entregado se relaciona con −ΔG; a temperatura y volumen constantes, el trabajo máximo se relaciona con −ΔA."
+                    ],
+                    "answer": 3,
+                    "explain": "Con la convención de trabajo entregado por el sistema, el máximo trabajo útil no expansivo a T y P constantes es −ΔG. A T y V constantes, la disminución de Helmholtz determina el trabajo máximo disponible bajo las condiciones apropiadas."
+                },
+                {
+                    "id": "q16",
+                    "topic": "energias_libres",
+                    "text": "Una reacción presenta ΔH = +20 kJ/mol y ΔS = +0,050 kJ mol⁻¹ K⁻¹. ¿A qué temperatura se cumple ΔG = 0?",
+                    "options": [
+                        "250 K",
+                        "400 K",
+                        "100 K",
+                        "800 K"
+                    ],
+                    "answer": 1,
+                    "explain": "En el equilibrio límite, ΔG = ΔH − TΔS = 0; por tanto, T_eq = ΔH/ΔS = 20/0,050 = 400 K. Por encima de 400 K, ΔG < 0; por debajo, ΔG > 0, suponiendo que ΔH y ΔS se mantienen aproximadamente constantes."
+                },
+                {
+                    "id": "q17",
+                    "topic": "energias_libres",
+                    "text": "¿Qué combinación de signos hace que una reacción sea espontánea a cualquier temperatura, suponiendo ΔH y ΔS aproximadamente constantes?",
+                    "options": [
+                        "ΔH > 0 y ΔS < 0",
+                        "ΔH > 0 y ΔS > 0",
+                        "ΔH < 0 y ΔS > 0",
+                        "ΔH < 0 y ΔS < 0"
+                    ],
+                    "answer": 2,
+                    "explain": "Como ΔG = ΔH − TΔS, una entalpía negativa y una entropía positiva hacen negativos ambos aportes a ΔG. La reacción es favorable a todas las temperaturas dentro de la aproximación indicada."
+                },
+                {
+                    "id": "q18",
+                    "topic": "energias_libres",
+                    "text": "¿Qué combinación de signos hace que una reacción sea desfavorable a cualquier temperatura, suponiendo ΔH y ΔS aproximadamente constantes?",
+                    "options": [
+                        "ΔH > 0 y ΔS < 0",
+                        "ΔH < 0 y ΔS > 0",
+                        "ΔH < 0 y ΔS < 0",
+                        "ΔH > 0 y ΔS > 0"
+                    ],
+                    "answer": 0,
+                    "explain": "Si ΔH > 0 y ΔS < 0, entonces ΔG = ΔH − TΔS es positiva para cualquier temperatura positiva bajo la aproximación de signos constantes."
+                },
+                {
+                    "id": "q19",
+                    "topic": "energias_libres",
+                    "text": "¿Qué indica la energía libre estándar de reacción ΔrG°?",
+                    "options": [
+                        "La velocidad de reacción en cualquier composición.",
+                        "La tendencia termodinámica bajo condiciones estándar, sin determinar por sí sola la dirección real para cualquier composición.",
+                        "Que todos los reactivos se consumen por completo.",
+                        "Que el equilibrio siempre favorece a los productos."
+                    ],
+                    "answer": 1,
+                    "explain": "ΔrG° caracteriza la reacción en condiciones estándar y se relaciona con K°. La dirección real depende también de la composición mediante ΔrG = ΔrG° + RT ln Q."
+                },
+                {
+                    "id": "q20",
+                    "topic": "energias_libres",
+                    "text": "¿Cómo se calcula la energía libre estándar de reacción a partir de energías libres estándar de formación?",
+                    "options": [
+                        "ΔrG° = ΣG°f,reactivos − ΣG°f,productos, sin coeficientes estequiométricos.",
+                        "ΔrG° = ΔH° + TΔS°.",
+                        "ΔrG° = RT ln K° para cualquier reacción.",
+                        "ΔrG° = ΣνG°f,productos − ΣνG°f,reactivos, usando los coeficientes estequiométricos."
+                    ],
+                    "answer": 3,
+                    "explain": "ΔrG° = ΣνΔG°f(productos) − ΣνΔG°f(reactivos). Se incluyen los coeficientes estequiométricos. Para un elemento puro en su forma alotrópica más estable, ΔG°f = 0 en el estado de referencia."
+                },
+                {
+                    "id": "q21",
+                    "topic": "potencial_quimico",
+                    "text": "¿Qué representa el potencial químico de una especie?",
+                    "options": [
+                        "Su contribución molar diferencial a la energía de Gibbs y una medida de la tendencia de transferencia de materia.",
+                        "Su temperatura crítica.",
+                        "Su capacidad calorífica total.",
+                        "La velocidad con que atraviesa una membrana, independientemente de su estado."
+                    ],
+                    "answer": 0,
+                    "explain": "El potencial químico μᵢ se define como la derivada parcial de G respecto a la cantidad de sustancia nᵢ, manteniendo constantes T, P y las cantidades de las otras especies. Las diferencias de potencial químico impulsan transferencias de materia."
+                },
+                {
+                    "id": "q22",
+                    "topic": "potencial_quimico",
+                    "text": "¿Cuál es la condición de equilibrio para una especie transferible entre dos fases?",
+                    "options": [
+                        "Las dos fases deben tener necesariamente el mismo volumen.",
+                        "Las dos fases deben tener la misma composición total.",
+                        "El potencial químico de la especie debe ser igual en ambas fases.",
+                        "La presión parcial debe ser cero en ambas fases."
+                    ],
+                    "answer": 2,
+                    "explain": "En equilibrio entre fases, el potencial químico de cada especie que puede transferirse debe igualarse entre las fases. Así desaparece la fuerza impulsora neta para la transferencia."
+                },
+                {
+                    "id": "q23",
+                    "topic": "potencial_quimico",
+                    "text": "¿Qué expresión representa el potencial químico de un gas ideal puro a temperatura constante?",
+                    "options": [
+                        "μ = μ° − RT(P/P°)",
+                        "μ = μ° + RT ln(P/P°)",
+                        "μ = RT/P",
+                        "μ = μ° + PRT"
+                    ],
+                    "answer": 1,
+                    "explain": "Para un gas ideal, μ = μ° + RT ln(P/P°). La presión debe expresarse como una razón adimensional respecto de la presión estándar P°."
+                },
+                {
+                    "id": "q24",
+                    "topic": "potencial_quimico",
+                    "text": "Tres moles de un gas ideal se expanden isotérmicamente de 2 bar a 1 bar a 400 K. ¿Cuál es el cambio de energía de Gibbs?",
+                    "options": [
+                        "+6,92 kJ",
+                        "0 kJ",
+                        "−3,46 kJ",
+                        "−6,92 kJ"
+                    ],
+                    "answer": 3,
+                    "explain": "Para una expansión isotérmica de un gas ideal, ΔG = nRT ln(P₂/P₁). ΔG = 3 × 8,314 × 400 × ln(1/2) ≈ −6,92 kJ. El cambio negativo indica una disminución de Gibbs durante la expansión espontánea."
+                },
+                {
+                    "id": "q25",
+                    "topic": "potencial_quimico",
+                    "text": "¿Cuál es la relación entre la energía libre estándar de reacción y la constante de equilibrio termodinámica?",
+                    "options": [
+                        "ΔrG° = −RT ln K°",
+                        "ΔrG° = RTK°",
+                        "ΔrG° = −R ln(TK°)",
+                        "ΔrG° = RT ln Q en todas las condiciones"
+                    ],
+                    "answer": 0,
+                    "explain": "La relación fundamental es ΔrG° = −RT ln K°. Si K° > 1, ΔrG° < 0 y se favorecen los productos; si K° < 1, ΔrG° > 0 y se favorecen los reactivos; si K° = 1, ΔrG° = 0."
+                },
+                {
+                    "id": "q26",
+                    "topic": "potencial_quimico",
+                    "text": "Para una reacción, Q = 0,20 y K° = 2,0. ¿Qué dirección es termodinámicamente favorable en ese instante?",
+                    "options": [
+                        "La reacción inversa, porque Q < K°.",
+                        "El sistema está necesariamente en equilibrio.",
+                        "La reacción directa, porque Q < K° y ΔrG < 0.",
+                        "No puede determinarse sin conocer la velocidad de reacción."
+                    ],
+                    "answer": 2,
+                    "explain": "ΔrG = RT ln(Q/K°). Como 0,20/2,0 = 0,10, el logaritmo es negativo y ΔrG < 0. La reacción avanza espontáneamente en sentido directo hasta alcanzar el equilibrio."
+                },
+                {
+                    "id": "q27",
+                    "topic": "potencial_quimico",
+                    "text": "¿Cuál es la diferencia entre la constante de equilibrio K° y el cociente de reacción Q?",
+                    "options": [
+                        "Q solo se define para reacciones irreversibles.",
+                        "K° depende de la composición instantánea y Q solo de la temperatura.",
+                        "Ambos son siempre iguales, incluso antes del equilibrio.",
+                        "K° corresponde al equilibrio a una temperatura dada; Q describe la composición actual y permite determinar la dirección favorable."
+                    ],
+                    "answer": 3,
+                    "explain": "K° es la constante de equilibrio termodinámica y depende de la temperatura. Q se calcula con las actividades o presiones actuales. Q < K° favorece el sentido directo, Q > K° el inverso y Q = K° indica equilibrio."
+                },
+                {
+                    "id": "q28",
+                    "topic": "equilibrio_gaseoso",
+                    "text": "Para una mezcla gaseosa ideal, ¿cómo se obtiene la presión parcial de un componente i?",
+                    "options": [
+                        "Pᵢ = P_total/nᵢ",
+                        "Pᵢ = yᵢP_total, con yᵢ = nᵢ/n_total",
+                        "Pᵢ = n_totalRT",
+                        "Pᵢ = P_total/yᵢ"
+                    ],
+                    "answer": 1,
+                    "explain": "La ley de Dalton establece Pᵢ = yᵢP_total. La fracción molar es yᵢ = nᵢ/n_total y, para una mezcla de gases ideales, coincide con la fracción de presión."
+                },
+                {
+                    "id": "q29",
+                    "topic": "equilibrio_gaseoso",
+                    "text": "¿Qué procedimiento es adecuado para resolver un ejercicio de equilibrio gaseoso?",
+                    "options": [
+                        "Calcular K° sin balancear la reacción ni conocer las presiones.",
+                        "Suponer que los reactivos se consumen por completo.",
+                        "Balancear la reacción, registrar las condiciones iniciales, determinar los moles de equilibrio, calcular las presiones parciales y evaluar Kp o ΔrG°.",
+                        "Usar siempre la presión total como si fuera la presión parcial de cada especie."
+                    ],
+                    "answer": 2,
+                    "explain": "Primero se balancea la reacción y se identifican los datos iniciales. Después se aplica la estequiometría para obtener los moles de equilibrio, se calculan las fracciones molares y presiones parciales y, finalmente, se evalúa Kp o ΔrG°."
+                },
+                {
+                    "id": "q30",
+                    "topic": "equilibrio_gaseoso",
+                    "text": "Para SO₂(g) + ½ O₂(g) ⇌ SO₃(g), se tienen las fracciones molares y(SO₂) = 0,310, y(O₂) = 0,250 y y(SO₃) = 0,440 a P_total = 1767 torr. Usando presiones estándar de 1 bar, ¿qué valor aproximado se obtiene para Kp?",
+                    "options": [
+                        "0,0342",
+                        "34,2",
+                        "0,342",
+                        "3,42"
+                    ],
+                    "answer": 3,
+                    "explain": "P_total = 1767/750,06 ≈ 2,356 bar. Kp = (P_SO₃/P°)/[(P_SO₂/P°)(P_O₂/P°)^(1/2)]. Sustituyendo las fracciones molares y las presiones parciales, Kp ≈ 3,42. El resultado depende de la reacción balanceada y de la convención de presión estándar."
+                },
+                {
+                    "id": "q31",
+                    "topic": "equilibrio_gaseoso",
+                    "text": "Para O₂(g) ⇌ 2 O(g), inicialmente hay 0,1500 mol de O₂ en 32,80 L a 4000 K. Si la presión total de equilibrio es 2,175 atm, ¿cuál es el avance de reacción ξ?",
+                    "options": [
+                        "0,0673 mol",
+                        "0,1500 mol",
+                        "0,0327 mol",
+                        "0,2173 mol"
+                    ],
+                    "answer": 0,
+                    "explain": "n_total = PV/RT = (2,175 × 32,80)/(0,082057 × 4000) ≈ 0,2173 mol. Como n_total = 0,1500 + ξ para O₂ ⇌ 2 O, ξ = 0,2173 − 0,1500 = 0,0673 mol."
+                },
+                {
+                    "id": "q32",
+                    "topic": "equilibrio_gaseoso",
+                    "text": "En el ejercicio de disociación O₂(g) ⇌ 2 O(g), se obtiene ξ = 0,0673 mol. ¿Cuáles son aproximadamente los moles de equilibrio de O₂ y O?",
+                    "options": [
+                        "n(O₂) = 0,1500 mol y n(O) = 0 mol",
+                        "n(O₂) = 0,0673 mol y n(O) = 0,0827 mol",
+                        "n(O₂) = 0,0827 mol y n(O) = 0,1346 mol",
+                        "n(O₂) = 0,2173 mol y n(O) = 0,1346 mol"
+                    ],
+                    "answer": 2,
+                    "explain": "Por la estequiometría, n(O₂) = 0,1500 − ξ = 0,0827 mol y n(O) = 2ξ = 0,1346 mol. La suma es aproximadamente 0,2173 mol."
+                },
+                {
+                    "id": "q33",
+                    "topic": "equilibrio_gaseoso",
+                    "text": "¿Qué diferencia fundamental existe entre espontaneidad y cinética química?",
+                    "options": [
+                        "La espontaneidad indica la dirección termodinámicamente favorable; la cinética estudia la velocidad de reacción.",
+                        "Ambas describen exclusivamente la velocidad.",
+                        "La espontaneidad garantiza que una reacción sea rápida.",
+                        "La cinética determina por sí sola la constante termodinámica de equilibrio."
+                    ],
+                    "answer": 0,
+                    "explain": "La termodinámica determina la dirección favorable y la posición de equilibrio; la cinética determina la velocidad y el mecanismo. Una reacción espontánea puede ser muy lenta si existe una barrera de activación elevada."
+                },
+                {
+                    "id": "q34",
+                    "topic": "formato_examen",
+                    "text": "¿Cuál es la forma correcta de calcular el cambio de entropía de un gas ideal durante una expansión isotérmica reversible?",
+                    "options": [
+                        "ΔS = nR(V₂/V₁)",
+                        "ΔS = nR ln(V₂/V₁) = −nR ln(P₂/P₁)",
+                        "ΔS = nCp,m(T₂ − T₁)",
+                        "ΔS = −nR ln(V₂/V₁)"
+                    ],
+                    "answer": 1,
+                    "explain": "Para un gas ideal en un proceso isotérmico, ΔS = nR ln(V₂/V₁) = −nR ln(P₂/P₁). En una expansión, V₂ > V₁ y la entropía aumenta."
+                },
+                {
+                    "id": "q35",
+                    "topic": "formato_examen",
+                    "text": "¿Qué expresión permite calcular la variación de entropía de una reacción a partir de entropías molares estándar?",
+                    "options": [
+                        "ΔrS° = ΣνS°(reactivos) − ΣνS°(productos)",
+                        "ΔrS° = ΔrH°/T para cualquier reacción",
+                        "ΔrS° = ΣνS°(productos) − ΣνS°(reactivos)",
+                        "ΔrS° = RT ln K°"
+                    ],
+                    "answer": 2,
+                    "explain": "ΔrS° = ΣνS°(productos) − ΣνS°(reactivos). Se multiplican las entropías molares estándar por los coeficientes estequiométricos y se resta la contribución de los reactivos."
+                },
+                {
+                    "id": "q36",
+                    "topic": "formato_examen",
+                    "text": "¿Cuál es el error más importante al utilizar ecuaciones termodinámicas con temperatura?",
+                    "options": [
+                        "Usar kelvin en las ecuaciones.",
+                        "Convertir kJ a J cuando corresponde.",
+                        "Considerar los coeficientes estequiométricos.",
+                        "Sustituir directamente grados Celsius en logaritmos termodinámicos o denominadores como ΔH/T."
+                    ],
+                    "answer": 3,
+                    "explain": "Las temperaturas termodinámicas deben expresarse en kelvin. También se deben mantener unidades compatibles y distinguir K°, que representa el equilibrio, de Q, que representa la composición actual."
+                }],
+            "glossary": [{
+                "term": "Primera ley de la termodinámica",
+                "def": "Principio de conservación de la energía. Con la convención de trabajo sobre el sistema, ΔU = q + w."
+            },
+                {
+                    "term": "Segunda ley de la termodinámica",
+                    "def": "Establece que la entropía del universo aumenta en los procesos espontáneos irreversibles y permanece constante en el límite reversible ideal."
+                },
+                {
+                    "term": "Enunciado de Kelvin–Planck",
+                    "def": "Una máquina térmica que opera en ciclo no puede convertir íntegramente en trabajo el calor recibido de un único depósito."
+                },
+                {
+                    "term": "Entropía",
+                    "def": "Función de estado extensiva relacionada con la dispersión de la energía y los microestados accesibles. Para una trayectoria reversible, dS = δq_rev/T."
+                },
+                {
+                    "term": "Ecuación de Boltzmann",
+                    "def": "S = k_B ln Ω, donde k_B es la constante de Boltzmann y Ω es el número de microestados accesibles."
+                },
+                {
+                    "term": "Entropía del universo",
+                    "def": "Suma de las variaciones de entropía del sistema y del entorno: ΔS_universo = ΔS_sistema + ΔS_entorno."
+                },
+                {
+                    "term": "Proceso reversible",
+                    "def": "Proceso ideal que puede invertirse mediante cambios infinitesimales, sin producción neta de entropía en el universo."
+                },
+                {
+                    "term": "Proceso irreversible",
+                    "def": "Proceso real con producción de entropía; para un proceso espontáneo irreversible, ΔS_universo > 0."
+                },
+                {
+                    "term": "Proceso adiabático",
+                    "def": "Proceso sin transferencia de calor, q = 0. Solo si es reversible resulta isentrópico."
+                },
+                {
+                    "term": "Entropía de transición de fase",
+                    "def": "Para una transición reversible a temperatura constante, ΔS = ΔH_transición/T. La vaporización tiene signo positivo y la condensación, negativo."
+                },
+                {
+                    "term": "Entropía de calentamiento",
+                    "def": "A presión constante y con Cp,m constante, ΔS = nCp,m ln(T₂/T₁). Para un gas ideal con Cp,m variable se integra Cp,m/T respecto a T."
+                },
+                {
+                    "term": "Entropía de gas ideal isotérmico",
+                    "def": "ΔS = nR ln(V₂/V₁) = −nR ln(P₂/P₁). La expansión isotérmica aumenta la entropía."
+                },
+                {
+                    "term": "Entropía estándar de reacción",
+                    "def": "ΔrS° = ΣνS°(productos) − ΣνS°(reactivos), con los coeficientes estequiométricos correspondientes."
+                },
+                {
+                    "term": "Tercera ley de la termodinámica",
+                    "def": "La entropía de un cristal perfecto en su estado fundamental no degenerado tiende a cero cuando T tiende a 0 K."
+                },
+                {
+                    "term": "Modelo de Debye",
+                    "def": "A bajas temperaturas, Cp,m = aT³; al integrar Cp,m/T desde 0 K, Sm = aT³/3 bajo esta aproximación."
+                },
+                {
+                    "term": "Regla de Trouton",
+                    "def": "Para líquidos normales no asociados en su punto de ebullición normal, ΔS_vap suele aproximarse a 85–88 J mol⁻¹ K⁻¹. Agua y etanol se desvían por asociación mediante puentes de hidrógeno."
+                },
+                {
+                    "term": "Energía libre de Gibbs",
+                    "def": "G = H − TS. A temperatura y presión constantes, ΔG < 0 indica espontaneidad; ΔG = 0, equilibrio; ΔG > 0, dirección no espontánea."
+                },
+                {
+                    "term": "Energía libre de Helmholtz",
+                    "def": "A = U − TS. A temperatura y volumen constantes, ΔA < 0 indica espontaneidad y ΔA = 0 corresponde al equilibrio."
+                },
+                {
+                    "term": "Trabajo útil máximo reversible",
+                    "def": "A T y P constantes, el máximo trabajo útil no expansivo entregado se relaciona con −ΔG. A T y V constantes, el trabajo máximo disponible se relaciona con −ΔA."
+                },
+                {
+                    "term": "Temperatura de equilibrio termodinámico",
+                    "def": "Si ΔH y ΔS son aproximadamente constantes, la temperatura a la que ΔG = 0 es T_eq = ΔH/ΔS, siempre que la razón sea físicamente aplicable."
+                },
+                {
+                    "term": "Energía libre estándar de formación",
+                    "def": "Cambio de energía libre asociado con la formación de un mol de sustancia a partir de sus elementos en los estados de referencia. Para un elemento en su forma más estable, ΔG°f = 0."
+                },
+                {
+                    "term": "Energía libre estándar de reacción",
+                    "def": "ΔrG° = ΣνΔG°f(productos) − ΣνΔG°f(reactivos). Se relaciona con la constante de equilibrio mediante ΔrG° = −RT ln K°."
+                },
+                {
+                    "term": "Potencial químico",
+                    "def": "μᵢ = (∂G/∂nᵢ) a T y P constantes. Es la contribución molar diferencial a Gibbs y gobierna la transferencia de materia."
+                },
+                {
+                    "term": "Equilibrio entre fases",
+                    "def": "Para cada especie transferible, el potencial químico debe ser igual en las fases en equilibrio."
+                },
+                {
+                    "term": "Potencial químico de un gas ideal",
+                    "def": "μᵢ = μᵢ° + RT ln(Pᵢ/P°). Para mezclas gaseosas ideales se utiliza la presión parcial de cada especie."
+                },
+                {
+                    "term": "Actividad",
+                    "def": "Magnitud termodinámica adimensional que representa la concentración efectiva. En gases ideales, aᵢ = Pᵢ/P°."
+                },
+                {
+                    "term": "Fugacidad",
+                    "def": "Magnitud que sustituye la presión en la expresión del potencial químico de gases reales para considerar sus desviaciones de la idealidad."
+                },
+                {
+                    "term": "Constante de equilibrio termodinámica",
+                    "def": "K° es adimensional y corresponde al valor de Q en equilibrio. Para gases ideales se expresa mediante presiones parciales divididas por la presión estándar, elevadas a sus coeficientes estequiométricos."
+                },
+                {
+                    "term": "Cociente de reacción",
+                    "def": "Q tiene la misma estructura algebraica que K°, pero se calcula con la composición actual. Compara el estado presente con el equilibrio."
+                },
+                {
+                    "term": "Relación entre ΔrG, Q y K°",
+                    "def": "ΔrG = RT ln(Q/K°). Si Q < K°, la reacción directa es favorable; si Q > K°, es favorable la inversa; si Q = K°, existe equilibrio."
+                },
+                {
+                    "term": "Ley de Dalton",
+                    "def": "La presión parcial de un gas ideal es Pᵢ = yᵢP_total, donde yᵢ = nᵢ/n_total es su fracción molar."
+                },
+                {
+                    "term": "Avance de reacción",
+                    "def": "Variable ξ que relaciona el cambio de cantidad de cada especie con su coeficiente estequiométrico: nᵢ = nᵢ,0 + νᵢξ, con νᵢ negativo para reactivos y positivo para productos."
+                },
+                {
+                    "term": "Equilibrio gaseoso",
+                    "def": "Estado en que las velocidades directa e inversa son iguales y Q = K°. Los moles y presiones parciales se obtienen mediante estequiometría, fracciones molares y la ley de Dalton."
+                },
+                {
+                    "term": "Espontaneidad",
+                    "def": "Tendencia termodinámica de un proceso bajo condiciones especificadas; no indica necesariamente que ocurra con rapidez."
+                },
+                {
+                    "term": "Cinética química",
+                    "def": "Estudia la velocidad y el mecanismo de reacción. Una reacción termodinámicamente espontánea puede ser lenta por su barrera de activación."
+                }],
+            "flashcards": [{
+                "id": "f1",
+                "front": "Primera ley",
+                "back": "Conservación de la energía. Con trabajo sobre el sistema: ΔU = q + w."
+            },
+                {
+                    "id": "f2",
+                    "front": "Segunda ley",
+                    "back": "ΔS_universo > 0 en procesos espontáneos irreversibles; = 0 en procesos reversibles ideales."
+                },
+                {
+                    "id": "f3",
+                    "front": "Kelvin–Planck",
+                    "back": "Una máquina térmica cíclica no convierte todo el calor de un único depósito en trabajo."
+                },
+                {
+                    "id": "f4",
+                    "front": "Ecuación de Boltzmann",
+                    "back": "S = k_B ln Ω. Más microestados accesibles implican mayor entropía."
+                },
+                {
+                    "id": "f5",
+                    "front": "Entropía reversible",
+                    "back": "dS = δq_rev/T. La entropía es una función de estado."
+                },
+                {
+                    "id": "f6",
+                    "front": "Entropía del universo",
+                    "back": "ΔS_universo = ΔS_sistema + ΔS_entorno."
+                },
+                {
+                    "id": "f7",
+                    "front": "Adiabático reversible",
+                    "back": "q = 0 y ΔS = 0: proceso isentrópico."
+                },
+                {
+                    "id": "f8",
+                    "front": "Adiabático irreversible",
+                    "back": "q = 0, pero la entropía puede aumentar. La expansión libre de un gas ideal tiene ΔU = 0 y ΔS > 0."
+                },
+                {
+                    "id": "f9",
+                    "front": "Cambio de fase",
+                    "back": "ΔS = ΔH_transición/T. Vaporización: ΔS > 0; condensación: ΔS < 0."
+                },
+                {
+                    "id": "f10",
+                    "front": "Calentamiento a P constante",
+                    "back": "Con Cp,m constante: ΔS = nCp,m ln(T₂/T₁). Usar kelvin."
+                },
+                {
+                    "id": "f11",
+                    "front": "Gas ideal isotérmico",
+                    "back": "ΔS = nR ln(V₂/V₁) = −nR ln(P₂/P₁)."
+                },
+                {
+                    "id": "f12",
+                    "front": "Tercera ley",
+                    "back": "Para un cristal perfecto no degenerado, S → 0 cuando T → 0 K."
+                },
+                {
+                    "id": "f13",
+                    "front": "Debye a baja T",
+                    "back": "Cp,m = aT³; al integrar, Sm = aT³/3."
+                },
+                {
+                    "id": "f14",
+                    "front": "Regla de Trouton",
+                    "back": "ΔS_vap ≈ 85–88 J mol⁻¹ K⁻¹ para líquidos normales no asociados."
+                },
+                {
+                    "id": "f15",
+                    "front": "Energía libre de Gibbs",
+                    "back": "G = H − TS. A T y P constantes: ΔG < 0 espontáneo; = 0 equilibrio."
+                },
+                {
+                    "id": "f16",
+                    "front": "Energía libre de Helmholtz",
+                    "back": "A = U − TS. A T y V constantes: ΔA < 0 espontáneo; = 0 equilibrio."
+                },
+                {
+                    "id": "f17",
+                    "front": "Trabajo máximo reversible",
+                    "back": "A T y P constantes, trabajo útil máximo entregado = −ΔG; a T y V constantes, se relaciona con −ΔA."
+                },
+                {
+                    "id": "f18",
+                    "front": "Signos de ΔH y ΔS",
+                    "back": "ΔH < 0, ΔS > 0: favorable a toda T. ΔH > 0, ΔS < 0: desfavorable a toda T."
+                },
+                {
+                    "id": "f19",
+                    "front": "Temperatura de equilibrio",
+                    "back": "Si ΔH y ΔS son constantes, T_eq = ΔH/ΔS cuando ΔG = 0."
+                },
+                {
+                    "id": "f20",
+                    "front": "ΔrG° desde formación",
+                    "back": "ΣνΔG°f(productos) − ΣνΔG°f(reactivos). Elementos en su estado estándar: ΔG°f = 0."
+                },
+                {
+                    "id": "f21",
+                    "front": "Potencial químico",
+                    "back": "μᵢ = (∂G/∂nᵢ) a T y P constantes. Las diferencias impulsan transferencia de materia."
+                },
+                {
+                    "id": "f22",
+                    "front": "Potencial químico gaseoso",
+                    "back": "μᵢ = μᵢ° + RT ln(Pᵢ/P°) para gases ideales."
+                },
+                {
+                    "id": "f23",
+                    "front": "Equilibrio entre fases",
+                    "back": "Para cada especie transferible, μᵢ debe ser igual en las fases."
+                },
+                {
+                    "id": "f24",
+                    "front": "ΔrG° y K°",
+                    "back": "ΔrG° = −RT ln K°. K° > 1 favorece productos; K° < 1 favorece reactivos."
+                },
+                {
+                    "id": "f25",
+                    "front": "ΔrG, Q y K°",
+                    "back": "ΔrG = RT ln(Q/K°). Q < K°: avance directo; Q > K°: inverso."
+                },
+                {
+                    "id": "f26",
+                    "front": "Ley de Dalton",
+                    "back": "Pᵢ = yᵢP_total; yᵢ = nᵢ/n_total."
+                },
+                {
+                    "id": "f27",
+                    "front": "Avance de reacción",
+                    "back": "nᵢ = nᵢ,0 + νᵢξ. νᵢ es negativo para reactivos y positivo para productos."
+                },
+                {
+                    "id": "f28",
+                    "front": "Espontaneidad vs. cinética",
+                    "back": "Termodinámica: dirección favorable. Cinética: velocidad y mecanismo."
+                },
+                {
+                    "id": "f29",
+                    "front": "Temperatura y unidades",
+                    "back": "Usar kelvin en logaritmos y ecuaciones termodinámicas; mantener consistencia entre J y kJ."
+                },
+                {
+                    "id": "f30",
+                    "front": "Orden de un ejercicio de equilibrio",
+                    "back": "Balancear → registrar datos → hallar moles de equilibrio → calcular presiones parciales → evaluar Kp o ΔrG°."
+                }],
+            "structures": [{
+                "id": "s1",
+                "title": "Figura 1. [https://nombre.imaeng](https://nombre.imaeng). ¿Qué principio termodinámico se representa y qué condición establece sobre la entropía del universo?",
+                "img": "",
+                "options": [
+                    "Primera ley: la energía siempre disminuye.",
+                    "Segunda ley: la entropía del universo aumenta en procesos espontáneos irreversibles.",
+                    "Tercera ley: toda sustancia tiene entropía infinita a 0 K.",
+                    "Ley de Dalton: todas las presiones parciales son iguales."
+                ],
+                "answer": 1,
+                "explain": "La segunda ley establece el criterio de dirección espontánea mediante la variación de entropía del universo. Para procesos espontáneos irreversibles, ΔS_universo > 0."
+            },
+                {
+                    "id": "s2",
+                    "title": "Figura 2. [https://nombre.imaeng](https://nombre.imaeng). ¿Qué expresión permite interpretar la espontaneidad bajo presión y temperatura constantes?",
+                    "img": "",
+                    "options": [
+                        "ΔG = ΔH + TΔS",
+                        "ΔG = RT ln Q en cualquier condición",
+                        "ΔG = ΔH − TΔS",
+                        "ΔG = −RT ln(V₂/V₁)"
+                    ],
+                    "answer": 2,
+                    "explain": "La expresión de Gibbs es ΔG = ΔH − TΔS. A T y P constantes, ΔG < 0 indica espontaneidad, ΔG = 0 equilibrio y ΔG > 0 una dirección no espontánea."
+                },
+                {
+                    "id": "s3",
+                    "title": "Figura 3. [https://nombre.imaeng](https://nombre.imaeng). ¿Qué relación termodinámica conecta la energía libre estándar de reacción con el equilibrio?",
+                    "img": "",
+                    "options": [
+                        "ΔrG° = −RT ln K°",
+                        "ΔrG° = RTK°",
+                        "ΔrG° = ΔH° + TΔS°",
+                        "ΔrG° = −R ln T"
+                    ],
+                    "answer": 0,
+                    "explain": "La relación ΔrG° = −RT ln K° conecta la energía libre estándar con la constante de equilibrio termodinámica."
+                },
+                {
+                    "id": "s4",
+                    "title": "Figura 4. [https://nombre.imaeng](https://nombre.imaeng). ¿Cómo se determina la dirección espontánea de una reacción a partir de su cociente de reacción?",
+                    "img": "",
+                    "options": [
+                        "Q > K° indica siempre avance directo.",
+                        "Q = K° implica que la reacción debe detenerse molecularmente.",
+                        "Q < K° indica avance inverso.",
+                        "Q < K° indica avance directo; Q > K° indica avance inverso; Q = K° corresponde al equilibrio."
+                    ],
+                    "answer": 3,
+                    "explain": "La dirección se obtiene con ΔrG = RT ln(Q/K°). El sistema tiende a evolucionar en el sentido que reduce la energía libre de Gibbs hasta alcanzar Q = K°."
+                },
+                {
+                    "id": "s5",
+                    "title": "Figura 5. [https://nombre.imaeng](https://nombre.imaeng). ¿Qué relación permite calcular la presión parcial de cada componente de una mezcla gaseosa ideal?",
+                    "img": "",
+                    "options": [
+                        "Pᵢ = P_total/yᵢ",
+                        "Pᵢ = yᵢP_total",
+                        "Pᵢ = RT/n_total",
+                        "Pᵢ = nᵢ/P_total"
+                    ],
+                    "answer": 1,
+                    "explain": "Por la ley de Dalton, Pᵢ = yᵢP_total y yᵢ = nᵢ/n_total. Se necesita conocer la fracción molar y la presión total."
+                },
+                {
+                    "id": "s6",
+                    "title": "Figura 6. [https://nombre.imaeng](https://nombre.imaeng). ¿Qué criterio de temperatura y volumen corresponde al uso de la energía de Helmholtz?",
+                    "img": "",
+                    "options": [
+                        "A = H − TS; espontaneidad a T y P constantes.",
+                        "A = U + TS; equilibrio cuando A es máxima.",
+                        "A = U − TS; a T y V constantes, ΔA < 0 indica espontaneidad.",
+                        "A = PV; no depende de la temperatura."
+                    ],
+                    "answer": 2,
+                    "explain": "La energía de Helmholtz se define como A = U − TS. A temperatura y volumen constantes, una disminución de A caracteriza un proceso espontáneo."
+                }],
+            "cases": [{
+                "id": "c1",
+                "text": "Un sistema experimenta ΔS_sistema = −5 J/K y ΔS_entorno = +8 J/K. Calcula la variación de entropía del universo e interpreta el proceso.",
+                "options": [
+                    "−13 J/K; proceso espontáneo irreversible.",
+                    "+3 J/K; proceso espontáneo irreversible.",
+                    "0 J/K; equilibrio reversible.",
+                    "+13 J/K; proceso imposible."
+                ],
+                "answer": 1,
+                "feedback": "Datos: ΔS_sistema = −5 J/K; ΔS_entorno = +8 J/K.\n\nOperación: ΔS_universo = ΔS_sistema + ΔS_entorno = −5 + 8.\n\nResultado: ΔS_universo = +3 J/K.\n\nInterpretación: la entropía total aumenta; el proceso es compatible con la segunda ley y es irreversible."
+            },
+                {
+                    "id": "c2",
+                    "text": "Se vaporizan reversiblemente 0,50 mol de etanol a 351,45 K, con ΔH_vap = 39,3 kJ/mol. Determina ΔS del sistema.",
+                    "options": [
+                        "−55,9 J/K",
+                        "19,65 J/K",
+                        "78,6 J/K",
+                        "55,9 J/K"
+                    ],
+                    "answer": 3,
+                    "feedback": "Datos: n = 0,50 mol; ΔH_vap = 39,3 kJ/mol = 39 300 J/mol; T = 351,45 K.\n\nFórmula: ΔS = q_rev/T = nΔH_vap/T.\n\nOperación: ΔS = (0,50 × 39 300)/351,45.\n\nResultado: ΔS ≈ 55,9 J/K.\n\nInterpretación: la vaporización incrementa la entropía del sistema."
+                },
+                {
+                    "id": "c3",
+                    "text": "Dos moles de Cl₂ se calientan a presión constante de 300 K a 400 K. Si Cp,m = 31 J mol⁻¹ K⁻¹, calcula ΔS.",
+                    "options": [
+                        "17,8 J/K",
+                        "62,0 J/K",
+                        "−17,8 J/K",
+                        "20,7 J/K"
+                    ],
+                    "answer": 0,
+                    "feedback": "Datos: n = 2 mol; Cp,m = 31 J mol⁻¹ K⁻¹; T₁ = 300 K; T₂ = 400 K.\n\nFórmula: ΔS = nCp,m ln(T₂/T₁).\n\nOperación: ΔS = 2 × 31 × ln(400/300).\n\nResultado: ΔS ≈ 17,8 J/K.\n\nInterpretación: el aumento de temperatura eleva la agitación térmica y la dispersión energética."
+                },
+                {
+                    "id": "c4",
+                    "text": "Un líquido tiene ΔH_vap = 30,0 kJ/mol y punto de ebullición normal de 350 K. Calcula ΔS_vap y compara el resultado con la regla de Trouton.",
+                    "options": [
+                        "85,7 J mol⁻¹ K⁻¹; compatible con el intervalo de líquidos normales no asociados.",
+                        "8,57 J mol⁻¹ K⁻¹; compatible con la regla de Trouton.",
+                        "−85,7 J mol⁻¹ K⁻¹; la vaporización reduce la entropía.",
+                        "105 J mol⁻¹ K⁻¹; valor obligatorio para todos los líquidos."
+                    ],
+                    "answer": 0,
+                    "feedback": "Datos: ΔH_vap = 30,0 kJ/mol = 30 000 J/mol; T_b = 350 K.\n\nFórmula: ΔS_vap = ΔH_vap/T_b.\n\nOperación: ΔS_vap = 30 000/350.\n\nResultado: ΔS_vap ≈ 85,7 J mol⁻¹ K⁻¹.\n\nInterpretación: el valor coincide aproximadamente con la regla de Trouton, cuyo intervalo típico para líquidos normales no asociados es 85–88 J mol⁻¹ K⁻¹."
+                },
+                {
+                    "id": "c5",
+                    "text": "Una reacción presenta ΔH = +20 kJ/mol y ΔS = +0,050 kJ mol⁻¹ K⁻¹. Determina T_eq y el signo de ΔG por encima y por debajo de esa temperatura.",
+                    "options": [
+                        "T_eq = 400 K; ΔG > 0 por encima de ella.",
+                        "T_eq = 250 K; ΔG = 0 para cualquier temperatura.",
+                        "T_eq = 400 K; ΔG < 0 por encima y ΔG > 0 por debajo.",
+                        "T_eq = 100 K; ΔG < 0 por debajo de ella."
+                    ],
+                    "answer": 2,
+                    "feedback": "Datos: ΔH = +20 kJ/mol; ΔS = +0,050 kJ mol⁻¹ K⁻¹.\n\nCondición de equilibrio: ΔG = ΔH − TΔS = 0.\n\nOperación: T_eq = ΔH/ΔS = 20/0,050.\n\nResultado: T_eq = 400 K.\n\nInterpretación: por encima de 400 K, el término TΔS domina y ΔG < 0; por debajo, ΔG > 0, suponiendo ΔH y ΔS aproximadamente constantes."
+                },
+                {
+                    "id": "c6",
+                    "text": "Una celda de combustible opera a temperatura y presión constantes y presenta ΔG = −150 kJ/mol de reacción. ¿Qué conclusión se obtiene sobre el trabajo eléctrico máximo ideal entregado?",
+                    "options": [
+                        "No puede entregar trabajo porque ΔG es negativo.",
+                        "Puede entregar hasta 150 kJ/mol de trabajo útil no expansivo en el límite reversible.",
+                        "Debe absorber 150 kJ/mol de trabajo eléctrico.",
+                        "El trabajo máximo es necesariamente cero en una reacción espontánea."
+                    ],
+                    "answer": 1,
+                    "feedback": "Datos: ΔG = −150 kJ/mol.\n\nRelación: el trabajo útil máximo reversible entregado a T y P constantes se relaciona con −ΔG.\n\nResultado ideal: w_útil,máx entregado = 150 kJ/mol.\n\nInterpretación: la disminución de Gibbs representa el máximo trabajo útil no expansivo disponible bajo las condiciones indicadas. El trabajo real suele ser menor por irreversibilidades."
+                },
+                {
+                    "id": "c7",
+                    "text": "Tres moles de un gas ideal se expanden isotérmicamente de 2 bar a 1 bar a 400 K. Calcula ΔG.",
+                    "options": [
+                        "+6,92 kJ",
+                        "−3,46 kJ",
+                        "0 kJ",
+                        "−6,92 kJ"
+                    ],
+                    "answer": 3,
+                    "feedback": "Datos: n = 3 mol; T = 400 K; P₁ = 2 bar; P₂ = 1 bar; R = 8,314 J mol⁻¹ K⁻¹.\n\nFórmula: ΔG = nRT ln(P₂/P₁).\n\nOperación: ΔG = 3 × 8,314 × 400 × ln(1/2).\n\nResultado: ΔG ≈ −6,92 kJ.\n\nInterpretación: la expansión isotérmica disminuye la energía de Gibbs del gas ideal."
+                },
+                {
+                    "id": "c8",
+                    "text": "Para una reacción a cierta temperatura, Q = 0,20 y K° = 2,0. Determina la dirección espontánea.",
+                    "options": [
+                        "Directa, porque Q < K° y ΔrG < 0.",
+                        "Inversa, porque Q < K°.",
+                        "Equilibrio, porque Q es positivo.",
+                        "No puede determinarse sin conocer el mecanismo."
+                    ],
+                    "answer": 0,
+                    "feedback": "Datos: Q = 0,20; K° = 2,0.\n\nFórmula: ΔrG = RT ln(Q/K°).\n\nOperación: Q/K° = 0,20/2,0 = 0,10; ln(0,10) < 0.\n\nResultado: ΔrG < 0.\n\nInterpretación: el avance directo es termodinámicamente favorable hasta que Q alcance K°."
+                },
+                {
+                    "id": "c9",
+                    "text": "Para SO₂(g) + ½ O₂(g) ⇌ SO₃(g), las fracciones molares son 0,310; 0,250 y 0,440, respectivamente. La presión total es 1767 torr. Calcula Kp usando P° = 1 bar.",
+                    "options": [
+                        "Kp ≈ 0,342",
+                        "Kp ≈ 34,2",
+                        "Kp ≈ 3,42",
+                        "Kp ≈ 0,0342"
+                    ],
+                    "answer": 2,
+                    "feedback": "Datos: y(SO₂) = 0,310; y(O₂) = 0,250; y(SO₃) = 0,440; P_total = 1767 torr; P° = 1 bar.\n\nConversión: P_total ≈ 1767/750,06 = 2,356 bar.\n\nPresiones parciales: P_SO₂ = 0,310 × 2,356 ≈ 0,730 bar; P_O₂ = 0,250 × 2,356 ≈ 0,589 bar; P_SO₃ = 0,440 × 2,356 ≈ 1,037 bar.\n\nExpresión: Kp = (P_SO₃/P°)/[(P_SO₂/P°)(P_O₂/P°)^(1/2)].\n\nResultado: Kp ≈ 3,42.\n\nInterpretación: con la reacción y las presiones estándar indicadas, se obtiene una constante mayor que uno."
+                },
+                {
+                    "id": "c10",
+                    "text": "Para O₂(g) ⇌ 2 O(g), inicialmente hay 0,1500 mol de O₂ en 32,80 L a 4000 K. La presión total de equilibrio es 2,175 atm. Determina ξ y las cantidades de equilibrio.",
+                    "options": [
+                        "ξ = 0,0327 mol; n(O₂) = 0,1173 mol; n(O) = 0,0654 mol.",
+                        "ξ = 0,0673 mol; n(O₂) = 0,0827 mol; n(O) = 0,1346 mol.",
+                        "ξ = 0,2173 mol; n(O₂) = 0 mol; n(O) = 0,4346 mol.",
+                        "ξ = 0,1500 mol; n(O₂) = 0 mol; n(O) = 0,3000 mol."
+                    ],
+                    "answer": 1,
+                    "feedback": "Datos: n₀(O₂) = 0,1500 mol; V = 32,80 L; T = 4000 K; P_total = 2,175 atm; R = 0,082057 L atm mol⁻¹ K⁻¹.\n\nPaso 1: n_total = PV/RT = (2,175 × 32,80)/(0,082057 × 4000) ≈ 0,2173 mol.\n\nPaso 2: para O₂ ⇌ 2 O, n_total = 0,1500 + ξ; por tanto, ξ ≈ 0,0673 mol.\n\nPaso 3: n(O₂) = 0,1500 − ξ = 0,0827 mol; n(O) = 2ξ = 0,1346 mol.\n\nResultado: n_total ≈ 0,2173 mol.\n\nInterpretación: el aumento del número total de moles se debe a la disociación de O₂ en átomos de oxígeno."
+                },
+                {
+                    "id": "c11",
+                    "text": "Una reacción presenta ΔrG° = −10,2 kJ/mol a una temperatura dada. ¿Qué indica este valor sobre K°?",
+                    "options": [
+                        "K° < 1; se favorecen necesariamente los reactivos.",
+                        "K° = 0; no hay equilibrio posible.",
+                        "K° = 1; la energía libre estándar es cero.",
+                        "K° > 1; se favorecen los productos en condiciones estándar."
+                    ],
+                    "answer": 3,
+                    "feedback": "Relación: ΔrG° = −RT ln K°.\n\nComo ΔrG° es negativo, ln K° debe ser positivo y K° > 1.\n\nInterpretación: el equilibrio favorece a los productos en condiciones estándar. La composición real y la dirección instantánea se evalúan comparando Q con K°."
+                },
+                {
+                    "id": "c12",
+                    "text": "Durante una expansión libre de un gas ideal en un recipiente aislado, ¿qué combinación de cambios es correcta?",
+                    "options": [
+                        "q = 0, w = 0, ΔU = 0 y ΔS > 0.",
+                        "q > 0, w < 0, ΔU > 0 y ΔS = 0.",
+                        "q = 0, w > 0, ΔU < 0 y ΔS < 0.",
+                        "q < 0, w = 0, ΔU > 0 y ΔS < 0."
+                    ],
+                    "answer": 0,
+                    "feedback": "En la expansión libre contra el vacío no se realiza trabajo de expansión y el recipiente aislado no intercambia calor: q = 0 y w = 0. Por la primera ley, ΔU = 0. Para un gas ideal, la energía interna depende solo de T, por lo que la temperatura no cambia; sin embargo, aumenta el volumen accesible y ΔS > 0."
+                },
+                {
+                    "id": "c13",
+                    "text": "Se desea calcular ΔrG° a partir de las energías libres estándar de formación de reactivos y productos. ¿Qué procedimiento es correcto?",
+                    "options": [
+                        "Sumar solo los valores de los productos sin coeficientes.",
+                        "Restar la suma de los productos a la de los reactivos.",
+                        "Multiplicar cada ΔG°f por su coeficiente estequiométrico y restar la suma de reactivos de la suma de productos.",
+                        "Usar únicamente la temperatura y la presión total."
+                    ],
+                    "answer": 2,
+                    "feedback": "Procedimiento: ΔrG° = ΣνΔG°f(productos) − ΣνΔG°f(reactivos).\n\nSe multiplican las energías libres estándar de formación por los coeficientes estequiométricos y se suman por separado los productos y los reactivos.\n\nRecuerda: para los elementos puros en su forma de referencia más estable, ΔG°f = 0."
+                },
+                {
+                    "id": "c14",
+                    "text": "Una reacción es termodinámicamente espontánea, pero experimentalmente ocurre muy lentamente. ¿Qué explicación es correcta?",
+                    "options": [
+                        "La reacción no puede ser espontánea si es lenta.",
+                        "La espontaneidad depende solo de la energía de activación.",
+                        "La constante de equilibrio indica directamente la velocidad.",
+                        "La termodinámica indica la dirección favorable, mientras que la cinética y la barrera de activación determinan la rapidez."
+                    ],
+                    "answer": 3,
+                    "feedback": "La espontaneidad se evalúa con criterios termodinámicos como ΔG o ΔS_universo. La velocidad depende de la cinética y del mecanismo, incluida la barrera de activación. Una reacción favorable puede tardar mucho en alcanzar el equilibrio."
+                },
+                {
+                    "id": "c15",
+                    "text": "Una mezcla de gases ideales tiene P_total = 4,00 bar y fracciones molares y(A) = 0,25 e y(B) = 0,75. Calcula las presiones parciales.",
+                    "options": [
+                        "P_A = 1,00 bar y P_B = 3,00 bar.",
+                        "P_A = 4,00 bar y P_B = 4,00 bar.",
+                        "P_A = 0,25 bar y P_B = 0,75 bar.",
+                        "P_A = 3,00 bar y P_B = 1,00 bar."
+                    ],
+                    "answer": 0,
+                    "feedback": "Datos: P_total = 4,00 bar; y(A) = 0,25; y(B) = 0,75.\n\nFórmula: Pᵢ = yᵢP_total.\n\nOperación: P_A = 0,25 × 4,00 = 1,00 bar; P_B = 0,75 × 4,00 = 3,00 bar.\n\nComprobación: P_A + P_B = 4,00 bar, igual a la presión total."
+                }],
+            "interactives": [{
+                "id": "i1",
+                "type": "dragdrop",
+                "title": "Relaciona cada principio con su significado",
+                "terms": [
+                    "Primera ley",
+                    "Segunda ley",
+                    "Tercera ley",
+                    "Kelvin–Planck"
+                ],
+                "targets": [
+                    "Conservación de la energía",
+                    "Dirección de los procesos mediante la entropía del universo",
+                    "Entropía tendente a cero para un cristal perfecto no degenerado cuando T tiende a 0 K",
+                    "Imposibilidad de convertir íntegramente en trabajo el calor de un único depósito en un ciclo"
+                ],
+                "answerMap": {
+                    "Primera ley": "Conservación de la energía",
+                    "Segunda ley": "Dirección de los procesos mediante la entropía del universo",
+                    "Tercera ley": "Entropía tendente a cero para un cristal perfecto no degenerado cuando T tiende a 0 K",
+                    "Kelvin–Planck": "Imposibilidad de convertir íntegramente en trabajo el calor de un único depósito en un ciclo"
+                }
+            },
+                {
+                    "id": "i2",
+                    "type": "complete",
+                    "title": "Completa el criterio de entropía",
+                    "prompt": "En un proceso espontáneo irreversible, ΔS del universo es ______; en el límite reversible ideal, ΔS del universo es ______.",
+                    "answer": "positiva; cero"
+                },
+                {
+                    "id": "i3",
+                    "type": "complete",
+                    "title": "Completa las ecuaciones de entropía",
+                    "prompt": "Para un calentamiento a presión constante con Cp,m constante: ΔS = nCp,m ln(____/____). Para una expansión isotérmica de gas ideal: ΔS = nR ln(____/____).",
+                    "answer": "T₂/T₁; V₂/V₁"
+                },
+                {
+                    "id": "i4",
+                    "type": "dragdrop",
+                    "title": "Relaciona la función de estado con sus condiciones",
+                    "terms": [
+                        "Gibbs",
+                        "Helmholtz",
+                        "Entropía de transición de fase",
+                        "Potencial químico"
+                    ],
+                    "targets": [
+                        "G = H − TS; criterio de espontaneidad a T y P constantes",
+                        "A = U − TS; criterio de espontaneidad a T y V constantes",
+                        "ΔS = ΔH_transición/T para una transición reversible isotérmica",
+                        "Contribución molar diferencial a la energía de Gibbs"
+                    ],
+                    "answerMap": {
+                        "Gibbs": "G = H − TS; criterio de espontaneidad a T y P constantes",
+                        "Helmholtz": "A = U − TS; criterio de espontaneidad a T y V constantes",
+                        "Entropía de transición de fase": "ΔS = ΔH_transición/T para una transición reversible isotérmica",
+                        "Potencial químico": "Contribución molar diferencial a la energía de Gibbs"
+                    }
+                },
+                {
+                    "id": "i5",
+                    "type": "complete",
+                    "title": "Completa el criterio de Gibbs",
+                    "prompt": "A temperatura y presión constantes, ΔG < 0 indica un proceso ______; ΔG = 0 corresponde al ______.",
+                    "answer": "espontáneo; equilibrio"
+                },
+                {
+                    "id": "i6",
+                    "type": "complete",
+                    "title": "Calcula la temperatura de equilibrio",
+                    "prompt": "Si ΔH = +20 kJ/mol y ΔS = +0,050 kJ mol⁻¹ K⁻¹, T_eq = ΔH/ΔS = ______ K.",
+                    "answer": "400"
+                },
+                {
+                    "id": "i7",
+                    "type": "dragdrop",
+                    "title": "Relaciona los signos con la espontaneidad",
+                    "terms": [
+                        "ΔH < 0 y ΔS > 0",
+                        "ΔH > 0 y ΔS < 0",
+                        "ΔH < 0 y ΔS < 0",
+                        "ΔH > 0 y ΔS > 0"
+                    ],
+                    "targets": [
+                        "Favorable a toda temperatura bajo signos constantes",
+                        "Desfavorable a toda temperatura bajo signos constantes",
+                        "Favorable a temperaturas bajas",
+                        "Favorable a temperaturas altas"
+                    ],
+                    "answerMap": {
+                        "ΔH < 0 y ΔS > 0": "Favorable a toda temperatura bajo signos constantes",
+                        "ΔH > 0 y ΔS < 0": "Desfavorable a toda temperatura bajo signos constantes",
+                        "ΔH < 0 y ΔS < 0": "Favorable a temperaturas bajas",
+                        "ΔH > 0 y ΔS > 0": "Favorable a temperaturas altas"
+                    }
+                },
+                {
+                    "id": "i8",
+                    "type": "complete",
+                    "title": "Completa la relación entre Gibbs estándar y equilibrio",
+                    "prompt": "La relación fundamental es ΔrG° = ______. Si K° > 1, entonces ΔrG° es ______.",
+                    "answer": "−RT ln K°; negativa"
+                },
+                {
+                    "id": "i9",
+                    "type": "complete",
+                    "title": "Determina la dirección de reacción",
+                    "prompt": "Si Q < K°, ΔrG = RT ln(Q/K°) es ______ y se favorece el sentido ______.",
+                    "answer": "negativa; directo"
+                },
+                {
+                    "id": "i10",
+                    "type": "dragdrop",
+                    "title": "Relaciona cada magnitud de equilibrio con su función",
+                    "terms": [
+                        "K°",
+                        "Q",
+                        "Pᵢ",
+                        "ξ"
+                    ],
+                    "targets": [
+                        "Constante termodinámica de equilibrio",
+                        "Cociente calculado con la composición actual",
+                        "Presión parcial: Pᵢ = yᵢP_total",
+                        "Avance que relaciona moles y estequiometría"
+                    ],
+                    "answerMap": {
+                        "K°": "Constante termodinámica de equilibrio",
+                        "Q": "Cociente calculado con la composición actual",
+                        "Pᵢ": "Presión parcial: Pᵢ = yᵢP_total",
+                        "ξ": "Avance que relaciona moles y estequiometría"
+                    }
+                },
+                {
+                    "id": "i11",
+                    "type": "complete",
+                    "title": "Completa el potencial químico de un gas ideal",
+                    "prompt": "Para un gas ideal, μᵢ = μᵢ° + RT ln(____/____).",
+                    "answer": "Pᵢ/P°"
+                },
+                {
+                    "id": "i12",
+                    "type": "complete",
+                    "title": "Practica el cálculo de presión parcial",
+                    "prompt": "Una mezcla tiene P_total = 4,00 bar e y(A) = 0,25. La presión parcial de A es P_A = y_AP_total = ______ bar.",
+                    "answer": "1,00"
+                },
+                {
+                    "id": "i13",
+                    "type": "complete",
+                    "title": "Completa el balance por avance de reacción",
+                    "prompt": "La cantidad de sustancia en función del avance se calcula con nᵢ = nᵢ,0 + ______.",
+                    "answer": "νᵢξ"
+                },
+                {
+                    "id": "i14",
+                    "type": "dragdrop",
+                    "title": "Ordena mentalmente la resolución de un equilibrio gaseoso",
+                    "terms": [
+                        "Balancear la reacción",
+                        "Determinar los moles de equilibrio",
+                        "Calcular presiones parciales",
+                        "Evaluar Kp o ΔrG°"
+                    ],
+                    "targets": [
+                        "Paso 1: establecer la estequiometría",
+                        "Paso 2: aplicar el avance de reacción y las cantidades iniciales",
+                        "Paso 3: utilizar fracciones molares y la ley de Dalton",
+                        "Paso 4: evaluar el equilibrio o la energía libre estándar"
+                    ],
+                    "answerMap": {
+                        "Balancear la reacción": "Paso 1: establecer la estequiometría",
+                        "Determinar los moles de equilibrio": "Paso 2: aplicar el avance de reacción y las cantidades iniciales",
+                        "Calcular presiones parciales": "Paso 3: utilizar fracciones molares y la ley de Dalton",
+                        "Evaluar Kp o ΔrG°": "Paso 4: evaluar el equilibrio o la energía libre estándar"
+                    }
+                },
+                {
+                    "id": "i15",
+                    "type": "complete",
+                    "title": "Identifica los errores críticos de examen",
+                    "prompt": "En ecuaciones termodinámicas se utiliza la temperatura en ______. K° representa la constante de ______; Q representa la composición ______.",
+                    "answer": "kelvin; equilibrio; actual"
+                },
+                {
+                    "id": "i16",
+                    "type": "complete",
+                    "title": "Distingue espontaneidad y cinética",
+                    "prompt": "La termodinámica determina la dirección ______, mientras que la cinética estudia la ______ de reacción.",
+                    "answer": "favorable; velocidad"
+                }],
+            "maps": {
+                "entropia": "Segunda ley y entropía\n├─ Primera ley\n│  └─ Conservación de energía: ΔU = q + w\n├─ Segunda ley\n│  ├─ Espontáneo irreversible: ΔS_universo > 0\n│  ├─ Reversible ideal: ΔS_universo = 0\n│  └─ Kelvin–Planck: no convertir todo el calor de un depósito en trabajo cíclico\n├─ Boltzmann\n│  └─ S = k_B ln Ω; más microestados → mayor entropía\n├─ Entropía\n│  ├─ Función de estado extensiva\n│  ├─ dS = δq_rev/T\n│  ├─ ΔS_universo = ΔS_sistema + ΔS_entorno\n│  └─ Adiabático reversible → isentrópico; irreversible → ΔS puede aumentar\n├─ Cálculos\n│  ├─ Cambio de fase: ΔS = ΔH_transición/T\n│  ├─ Calentamiento a P constante: ΔS = nCp,m ln(T₂/T₁)\n│  ├─ Gas ideal isotérmico: ΔS = nR ln(V₂/V₁) = −nR ln(P₂/P₁)\n│  └─ Reacción: ΔrS° = ΣνS°_productos − ΣνS°_reactivos\n└─ Tercera ley\n   ├─ Cristal perfecto no degenerado: S → 0 cuando T → 0 K\n   ├─ Debye: Cp,m = aT³; Sm = aT³/3\n   └─ Trouton: ΔS_vap ≈ 85–88 J mol⁻¹ K⁻¹ en líquidos normales no asociados",
+                "energias_libres": "Energías libres y espontaneidad\n├─ Gibbs\n│  ├─ G = H − TS\n│  ├─ T y P constantes: ΔG < 0 → espontáneo\n│  ├─ ΔG = 0 → equilibrio\n│  ├─ ΔG > 0 → dirección no espontánea\n│  └─ Trabajo útil máximo entregado: −ΔG\n├─ Helmholtz\n│  ├─ A = U − TS\n│  ├─ T y V constantes: ΔA < 0 → espontáneo\n│  ├─ ΔA = 0 → equilibrio\n│  └─ Trabajo máximo disponible relacionado con −ΔA\n├─ Relación fundamental\n│  └─ ΔG = ΔH − TΔS\n├─ Signos\n│  ├─ ΔH < 0 y ΔS > 0 → favorable a toda T\n│  ├─ ΔH > 0 y ΔS < 0 → desfavorable a toda T\n│  ├─ ΔH < 0 y ΔS < 0 → favorable a T bajas\n│  └─ ΔH > 0 y ΔS > 0 → favorable a T altas\n├─ Temperatura límite\n│  └─ ΔG = 0 → T_eq = ΔH/ΔS\n└─ Reacción estándar\n   ├─ ΔrG° = ΣνΔG°f(productos) − ΣνΔG°f(reactivos)\n   ├─ Elementos en su estado estándar: ΔG°f = 0\n   └─ ΔrG° = −RT ln K°",
+                "potencial_quimico": "Potencial químico y equilibrio químico\n├─ Potencial químico\n│  ├─ μᵢ = (∂G/∂nᵢ) a T y P constantes\n│  ├─ Diferencias de μ impulsan la transferencia de materia\n│  └─ Equilibrio entre fases: μᵢ igual en cada fase\n├─ Gas ideal\n│  ├─ μᵢ = μᵢ° + RT ln(Pᵢ/P°)\n│  ├─ En mezclas se emplean presiones parciales\n│  └─ Gases reales: se utiliza fugacidad\n├─ Constante de equilibrio\n│  ├─ K° adimensional\n│  ├─ ΔrG° = −RT ln K°\n│  ├─ K° > 1 → productos favorecidos\n│  └─ K° < 1 → reactivos favorecidos\n└─ Cociente de reacción\n   ├─ Q usa la composición actual\n   ├─ ΔrG = RT ln(Q/K°)\n   ├─ Q < K° → avance directo\n   ├─ Q > K° → avance inverso\n   └─ Q = K° → equilibrio dinámico",
+                "equilibrio_gaseoso": "Equilibrio gaseoso y resolución de ejercicios\n├─ Estequiometría\n│  ├─ Balancear la reacción\n│  ├─ nᵢ = nᵢ,0 + νᵢξ\n│  ├─ νᵢ < 0 para reactivos\n│  └─ νᵢ > 0 para productos\n├─ Mezclas ideales\n│  ├─ yᵢ = nᵢ/n_total\n│  ├─ Pᵢ = yᵢP_total\n│  └─ P_total = n_totalRT/V\n├─ Resolución\n│  ├─ Registrar condiciones iniciales\n│  ├─ Hallar moles de equilibrio mediante ξ\n│  ├─ Calcular fracciones molares y presiones parciales\n│  └─ Evaluar Kp, ΔrG° o dirección espontánea\n├─ Ejemplos representativos\n│  ├─ Síntesis de amoníaco\n│  ├─ Disociación de O₂\n│  ├─ Disociación de N₂O₄\n│  └─ Oxidación de SO₂\n└─ Interpretación\n   ├─ K° caracteriza el equilibrio a una temperatura dada\n   ├─ Q describe la composición actual\n   └─ Espontaneidad no equivale a velocidad",
+                "formato_examen": "Cálculos y errores críticos\n├─ Temperatura\n│  └─ Usar kelvin en logaritmos y denominadores termodinámicos\n├─ Unidades\n│  ├─ Mantener coherencia entre J y kJ\n│  ├─ Presiones en unidades compatibles\n│  └─ Razones de presión adimensionales: Pᵢ/P°\n├─ Entropía\n│  ├─ ΔS = q_rev/T solo para una trayectoria reversible apropiada\n│  ├─ ΔS_universo = ΔS_sistema + ΔS_entorno\n│  └─ ΔS de una transición reversible = ΔH_transición/T\n├─ Gibbs y equilibrio\n│  ├─ ΔrG° = −RT ln K°\n│  ├─ ΔrG = RT ln(Q/K°)\n│  ├─ K°: equilibrio\n│  └─ Q: composición actual\n├─ Gases\n│  ├─ Balancear antes de calcular\n│  ├─ Aplicar nᵢ = nᵢ,0 + νᵢξ\n│  ├─ Calcular Pᵢ = yᵢP_total\n│  └─ Comprobar suma de moles y presiones\n└─ Distinción esencial\n   ├─ Termodinámica → dirección favorable\n   └─ Cinética → velocidad y mecanismo"
+            }
+        };
+
+        /* --------------------------
+  Utilidades y renderizado
+-------------------------- */
+        function ensureDbShape() {
+            DB.quizTopics = Array.isArray(DB.quizTopics) ? DB.quizTopics: [];
+            DB.questions = Array.isArray(DB.questions) ? DB.questions: [];
+            DB.glossary = Array.isArray(DB.glossary) ? DB.glossary: [];
+            DB.flashcards = Array.isArray(DB.flashcards) ? DB.flashcards: [];
+            DB.structures = Array.isArray(DB.structures) ? DB.structures: [];
+            DB.cases = Array.isArray(DB.cases) ? DB.cases: [];
+            DB.interactives = Array.isArray(DB.interactives) ? DB.interactives: [];
+            DB.maps = DB.maps && typeof DB.maps === 'object' ? DB.maps: {};
+        }
+
+        function escapeHtml(s) {
+            if (!s) return ''; return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+        }
+
+        /* render glossary */
+        function renderGloss() {
+            const list = document.getElementById('glossList');
+            list.innerHTML = '';
+
+            const glossary = Array.isArray(DB.glossary) ? DB.glossary: [];
+            const query = normalizeText(document.getElementById('glossSearch').value || '');
+
+            glossary
+            .filter(item => {
+                const term = normalizeText(item.term);
+                const def = normalizeText(item.def);
+                return !query || term.includes(query) || def.includes(query);
+            })
+            .forEach((g, idx) => {
+                const itemId = g.id || `gloss-${idx}`;
+
+                const div = document.createElement('div');
+                div.className = 'relative p-2 border-b';
+
+                div.innerHTML = `
+                <strong>${escapeHtml(g.term)}</strong>
+                <p class="text-xs text-gray-700 pr-14">${escapeHtml(g.def)}</p>
+
+                <button data-i="${idx}" class="edit-gloss text-blue-600 text-xs mt-1">
+                Editar
+                </button>
+
+                <div class="absolute bottom-1 right-1 flex gap-1">
+                <button data-section="gloss" data-id="${itemId}" data-correct="true" class="score-btn text-xs">✅</button>
+                <button data-section="gloss" data-id="${itemId}" data-correct="false" class="score-btn text-xs">❌</button>
+                </div>
+                `;
+
+                list.appendChild(div);
+            });
+
+            list.querySelectorAll('.edit-gloss').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const i = parseInt(btn.dataset.i);
+                    document.getElementById('termInput').value = DB.glossary[i].term || '';
+                    document.getElementById('defInput').value = DB.glossary[i].def || '';
+                    DB.glossary.splice(i, 1);
+                    renderGloss();
+                    saveToLocal();
+                    updateDashboard();
+                });
+            });
+
+            list.querySelectorAll('.score-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    markItem(
+                        btn.dataset.section,
+                        btn.dataset.id,
+                        btn.dataset.correct === 'true'
+                    );
+                });
+            });
+
+            document.getElementById('glossJSON').value = JSON.stringify(glossary, null, 2);
+        }
+        document.getElementById('glossSearch').addEventListener('input', renderGloss);
+
+        /* render flashcards */
+        function renderFlashcards() {
+            const cont = document.getElementById('flashContainer');
+            cont.innerHTML = '';
+
+            const flashcards = Array.isArray(DB.flashcards) ? DB.flashcards: [];
+
+            flashcards.forEach((f, i) => {
+                const itemId = f.id || `flash-${i}`;
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.width = '240px';
+
+                card.innerHTML = `
+                <div class="card-inner" data-index="${i}">
+                <div class="card-front">
+                ${escapeHtml(f.front)}
+                </div>
+
+                <div class="card-back relative">
+                <span class="pr-14">${escapeHtml(f.back)}</span>
+
+                <div class="absolute bottom-1 right-1 flex gap-1">
+                <button data-section="flash" data-id="${itemId}" data-correct="true" class="score-btn text-xs">✅</button>
+                <button data-section="flash" data-id="${itemId}" data-correct="false" class="score-btn text-xs">❌</button>
+                </div>
+                </div>
+                </div>
+                `;
+
+                card.querySelector('.card-inner').addEventListener('click', e => {
+                    const inner = e.currentTarget;
+                    inner.style.transform = inner.style.transform ? '': 'rotateY(180deg)';
+                });
+
+                card.querySelectorAll('.score-btn').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+
+                        markItem(
+                            btn.dataset.section,
+                            btn.dataset.id,
+                            btn.dataset.correct === 'true'
+                        );
+                    });
+                });
+
+                cont.appendChild(card);
+            });
+
+            document.getElementById('flashJSON').value = JSON.stringify(flashcards, null, 2);
+        }
+
+        /* render structures */
+        function renderStructures() {
+            const area = document.getElementById('structuresArea'); area.innerHTML = '';
+            const structures = Array.isArray(DB.structures) ? DB.structures: [];
+            structures.forEach((s, idx)=> {
+                const options = Array.isArray(s.options) ? s.options: [];
+                const wrap = document.createElement('div'); wrap.className = 'p-3 border rounded';
+                wrap.innerHTML = `<div><h4 class="font-semibold">${idx+1}. ${escapeHtml(s.title)}</h4><div class="text-sm mt-1">Imagen: <a class="link-img" target="_blank" href="${s.img}">${s.img}</a></div><div class="mt-2" id="opts-${idx}"></div></div>`;
+                area.appendChild(wrap);
+                const optsDiv = wrap.querySelector(`#opts-${idx}`);
+                options.forEach((o, i)=> {
+                    const radio = document.createElement('label'); radio.className = 'mr-3 block'; radio.innerHTML = `<input type="radio" name="struct_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(radio);
+                });
+                const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent = 'Verificar';
+                btn.addEventListener('click', () => {
+                    const sel = wrap.querySelector(`input[name="struct_${idx}"]:checked`);
+
+                    if (!sel) {
+                        alert('Selecciona opción');
+                        return;
+                    }
+
+                    const itemId = s.id || `structure-${idx}`;
+
+                    if (parseInt(sel.value) === s.answer) {
+                        alert('✅ Correcto\n' + (s.explain || ''));
+                        markItem('structures', itemId, true);
+                    } else {
+                        alert('❌ Incorrecto\n' + (s.explain || ''));
+                        markItem('structures', itemId, false);
+                    }
+                });
+                wrap.appendChild(btn);
+            });
+            document.getElementById('structuresJSON').value = JSON.stringify(structures, null, 2);
+        }
+
+        /* render cases */
+        function renderCases() {
+            const area = document.getElementById('casesArea'); area.innerHTML = '';
+            const casesList = Array.isArray(DB.cases) ? DB.cases: [];
+            casesList.forEach((c,
+                idx)=> {
+                const options = Array.isArray(c.options) ? c.options: [];
+                const wrap = document.createElement('div'); wrap.className = 'p-3 border rounded mb-3';
+                wrap.innerHTML = `<div><h4 class="font-semibold">Caso ${idx+1}</h4><p class="mt-1">${escapeHtml(c.text)}</p><div class="mt-2" id="caseOpts${idx}"></div></div>`;
+                area.appendChild(wrap);
+                const optsDiv = wrap.querySelector(`#caseOpts${idx}`);
+                options.forEach((o, i)=> {
+                    const label = document.createElement('label'); label.className = 'block'; label.innerHTML = `<input type="radio" name="case_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(label);
+                });
+                const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-indigo-600 text-white rounded'; btn.textContent = 'Responder';
+                btn.addEventListener('click',
+                    () => {
+                        const sel = wrap.querySelector(`input[name="case_${idx}"]:checked`);
+
+                        if (!sel) {
+                            alert('Selecciona opción');
+                            return;
+                        }
+
+                        const itemId = c.id || `case-${idx}`;
+
+                        if (parseInt(sel.value) === c.answer) {
+                            alert('✅ Correcto\n' + (c.feedback || ''));
+                            markItem('cases', itemId, true);
+                        } else {
+                            alert('❌ Incorrecto\n' + (c.feedback || ''));
+                            markItem('cases', itemId, false);
+                        }
+                    });
+                wrap.appendChild(btn);
+            });
+            document.getElementById('casesJSON').value = JSON.stringify(casesList, null, 2);
+        }
+
+        /* render interactives with correct drag/drop handling */
+        function renderInteratives() {
+            const area = document.getElementById('interactiveArea'); area.innerHTML = '';
+            (Array.isArray(DB.interactives) ? DB.interactives: []).forEach((it,
+                idx)=> {
+                const block = document.createElement('div'); block.className = 'p-3 border rounded';
+                block.innerHTML = `<h4 class="font-semibold">${idx+1}. ${escapeHtml(it.title || it.id)}</h4>`;
+                if (it.type === 'dragdrop') {
+                    const terms = Array.isArray(it.terms) ? it.terms: [];
+                    const targets = Array.isArray(it.targets) ? it.targets: [];
+                    const termsDiv = document.createElement('div'); termsDiv.className = 'mt-2 flex gap-2 flex-wrap';
+                    terms.forEach((t, i)=> {
+                        const d = document.createElement('div'); d.className = 'draggable'; d.id = `term-${idx}-${i}`; d.draggable = true; d.textContent = t;
+                        d.addEventListener('dragstart', e => {
+                            e.dataTransfer.setData('text/plain', d.id); e.dataTransfer.effectAllowed = 'move';
+                        });
+                        termsDiv.appendChild(d);
+                    });
+                    const targetsDiv = document.createElement('div'); targetsDiv.className = 'mt-3 grid grid-cols-1 gap-2';
+                    targets.forEach((tg, i)=> {
+                        const dz = document.createElement('div'); dz.className = 'dropzone'; dz.id = `target-${idx}-${i}`;
+                        dz.dataset.target = tg;
+                        const label = document.createElement('span');
+                        label.className = 'dropzone-label';
+                        label.textContent = tg;
+                        dz.appendChild(label);
+                        dz.addEventListener('dragover', e => {
+                            e.preventDefault(); e.dataTransfer.dropEffect = 'move'; dz.style.backgroundColor = '#f8fafc';
+                        });
+                        dz.addEventListener('dragleave', e => {
+                            dz.style.backgroundColor = '';
+                        });
+                        dz.addEventListener('drop', e => {
+                            e.preventDefault();
+                            dz.style.backgroundColor = '';
+                            const id = e.dataTransfer.getData('text/plain');
+                            const el = document.getElementById(id);
+                            if (!el) return;
+                            // append (this move automatically removes from previous parent)
+                            dz.appendChild(el);
+                            // compute trimmed texts
+                            const childText = el.textContent.trim();
+                            const expected = normalizeText((it.answerMap && it.answerMap[childText]) ? it.answerMap[childText]: '');
+                            const zoneText = normalizeText(dz.dataset.target || label.textContent || '');
+                            if (expected && expected === zoneText) {
+                                dz.style.borderColor = '#16a34a';
+                                dz.style.backgroundColor = '#ecfdf5';
+                                dz.dataset.correct = 'true';
+                            } else {
+                                dz.style.borderColor = '#dc2626';
+                                dz.style.backgroundColor = '#fff1f2';
+                                dz.dataset.correct = 'false';
+                            }
+                            // For other zones: if empty reset; if they have children, re-evaluate them
+                            targets.forEach((ot, j)=> {
+                                const otherDz = document.getElementById(`target-${idx}-${j}`);
+                                if (!otherDz) return;
+                                if (otherDz === dz) return;
+                                // remove any duplicate of the moved element (safety)
+                                Array.from(otherDz.querySelectorAll('.draggable')).forEach(ch => {
+                                    if (ch.id === el.id) otherDz.removeChild(ch);
+                                });
+                                if (otherDz.querySelectorAll('.draggable').length === 0) {
+                                    otherDz.style.borderColor = '#94a3b8'; otherDz.style.backgroundColor = ''; delete otherDz.dataset.correct;
+                                } else {
+                                    const rem = otherDz.querySelector('.draggable');
+                                    if (rem) {
+                                        const remText = rem.textContent.trim();
+                                        const remExp = normalizeText((it.answerMap && it.answerMap[remText]) ? it.answerMap[remText]: '');
+                                        const otherLabel = otherDz.querySelector('.dropzone-label');
+                                        const otherZoneText = normalizeText(otherDz.dataset.target || (otherLabel ? otherLabel.textContent: ''));
+                                        if (remExp && remExp === otherZoneText) {
+                                            otherDz.style.borderColor = '#16a34a'; otherDz.style.backgroundColor = '#ecfdf5'; otherDz.dataset.correct = 'true';
+                                        } else {
+                                            otherDz.style.borderColor = '#dc2626'; otherDz.style.backgroundColor = '#fff1f2'; otherDz.dataset.correct = 'false';
+                                        }
+                                    }
+                                }
+                            });
+                        });
+                        targetsDiv.appendChild(dz);
+                    });
+                    block.appendChild(termsDiv);
+                    block.appendChild(targetsDiv);
+
+                    const checkBtn = document.createElement('button');
+                    checkBtn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded';
+                    checkBtn.textContent = 'Verificar actividad';
+
+                    checkBtn.addEventListener('click', () => {
+                        const itemId = it.id || `interactive-${idx}`;
+                        const zones = block.querySelectorAll('.dropzone');
+                        const allCorrect = Array.from(zones).length > 0 &&
+                        Array.from(zones).every(zone => zone.dataset.correct === 'true');
+
+                        if (allCorrect) {
+                            alert('✅ Actividad correcta');
+                            markItem('interactive', itemId, true);
+                        } else {
+                            alert('❌ Revisa la actividad.');
+                            markItem('interactive', itemId, false);
+                        }
+                    });
+
+                    block.appendChild(checkBtn);
+                } else if (it.type === 'complete') {
+                    const q = document.createElement('div'); q.innerHTML = `<div class="mt-2">${escapeHtml(it.prompt || '')}</div><input class="mt-2 border rounded p-1" id="fill-${idx}">`;
+                    const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent = 'Verificar';
+                    btn.addEventListener('click', () => {
+                        const user = document.getElementById(`fill-${idx}`).value.trim();
+                        const itemId = it.id || `interactive-${idx}`;
+
+                        if (normalizeText(user) === normalizeText(it.answer || '')) {
+                            alert('✅ Correcto');
+                            markItem('interactive', itemId, true);
+                        } else {
+                            alert('❌ Incorrecto.');
+                            markItem('interactive', itemId, false);
+                        }
+                    });
+                    block.appendChild(q); block.appendChild(btn);
+                }
+                area.appendChild(block);
+            });
+            document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2);
+        }
+
+        /* render maps */
+        function renderMaps() {
+            const disp = document.getElementById('mapsDisplay');
+            disp.innerHTML = '';
+
+            Object.entries(DB.maps || {}).forEach(([k,
+                v]) => {
+                const itemId = `map-${k}`;
+
+                const div = document.createElement('div');
+                div.className = 'relative bg-gray-50 p-3 rounded';
+
+                div.innerHTML = `
+                <h3 class="font-semibold capitalize">${escapeHtml(k)}</h3>
+                <pre class="map pr-14">${escapeHtml(v)}</pre>
+
+                <div class="absolute bottom-1 right-1 flex gap-1">
+                <button data-section="maps" data-id="${itemId}" data-correct="true" class="score-btn text-xs">✅</button>
+                <button data-section="maps" data-id="${itemId}" data-correct="false" class="score-btn text-xs">❌</button>
+                </div>
+                `;
+
+                div.querySelectorAll('.score-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        markItem(
+                            btn.dataset.section,
+                            btn.dataset.id,
+                            btn.dataset.correct === 'true'
+                        );
+                    });
+                });
+
+                disp.appendChild(div);
+            });
+
+            document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
+        }
+
+        /* Save/load DB to localStorage */
+        function saveToLocal() {
+            localStorage.setItem('DB_biocel', JSON.stringify(DB));
+        }
+        function loadFromLocal() {
+            const raw = localStorage.getItem('DB_biocel');
+            if (raw) {
+                try {
+                    DB = JSON.parse(raw);
+                } catch(e) {
+                    console.error(e);
+                }
+            }
+            ensureDbShape();
+            renderAll();
+        }
+        function renderAll() {
+            ensureDbShape();
+            renderQuizTopics();
+            renderGloss();
+            renderFlashcards();
+            renderStructures();
+            renderCases();
+            renderInteratives();
+            renderMaps();
+
+            document.getElementById('questionsJSON').value = JSON.stringify(DB.questions || [], null, 2);
+            document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+
+            updateDashboard();
+        }
+        /* Score and dashboard */
+        const POINTS_PER_ITEM = 10;
+
+        function getProgress() {
+            return JSON.parse(localStorage.getItem('progressBySection') || '{}');
+        }
+
+        function saveProgress(progress) {
+            localStorage.setItem('progressBySection', JSON.stringify(progress));
+        }
+
+        function markItem(section, id, isCorrect) {
+            const progress = getProgress();
+
+            if (!progress[section]) {
+                progress[section] = {};
+            }
+
+            progress[section][id] = isCorrect ? 'correct': 'incorrect';
+
+            saveProgress(progress);
+            updateDashboard();
+        }
+
+        function countCorrect(progress, section) {
+            if (!progress[section]) return 0;
+
+            return Object.values(progress[section]).filter(value => value === 'correct').length;
+        }
+
+        function getSectionTotals() {
+            return {
+                quiz: Array.isArray(DB.questions) ? DB.questions.length: 0,
+                gloss: Array.isArray(DB.glossary) ? DB.glossary.length: 0,
+                flash: Array.isArray(DB.flashcards) ? DB.flashcards.length: 0,
+                structures: Array.isArray(DB.structures) ? DB.structures.length: 0,
+                cases: Array.isArray(DB.cases) ? DB.cases.length: 0,
+                interactive: Array.isArray(DB.interactives) ? DB.interactives.length: 0,
+                maps: DB.maps && typeof DB.maps === 'object' ? Object.keys(DB.maps).length: 0
+            };
+        }
+
+        function formatProgress(correct, total) {
+            const obtained = correct * POINTS_PER_ITEM;
+            const max = total * POINTS_PER_ITEM;
+            const percent = max > 0 ? Math.round((obtained / max) * 100): 0;
+
+            return {
+                obtained,
+                max,
+                percent,
+                text: `${obtained} / ${max} - ${percent}%`
+            };
+        }
+
+        function updateDashboard() {
+            const progress = getProgress();
+            const totals = getSectionTotals();
+
+            const quiz = formatProgress(countCorrect(progress, 'quiz'), totals.quiz);
+            const gloss = formatProgress(countCorrect(progress, 'gloss'), totals.gloss);
+            const flash = formatProgress(countCorrect(progress, 'flash'), totals.flash);
+            const structures = formatProgress(countCorrect(progress, 'structures'), totals.structures);
+            const cases = formatProgress(countCorrect(progress, 'cases'), totals.cases);
+            const interactive = formatProgress(countCorrect(progress, 'interactive'), totals.interactive);
+            const maps = formatProgress(countCorrect(progress, 'maps'), totals.maps);
+
+            const obtainedTotal =
+            quiz.obtained +
+            gloss.obtained +
+            flash.obtained +
+            structures.obtained +
+            cases.obtained +
+            interactive.obtained +
+            maps.obtained;
+
+            const maxTotal =
+            quiz.max +
+            gloss.max +
+            flash.max +
+            structures.max +
+            cases.max +
+            interactive.max +
+            maps.max;
+
+            const totalPercent = maxTotal > 0
+            ? Math.round((obtainedTotal / maxTotal) * 100): 0;
+
+            document.getElementById('score').textContent = obtainedTotal;
+            document.getElementById('maxScore').textContent = maxTotal;
+            document.getElementById('scorePercent').textContent = `${totalPercent}%`;
+
+            document.getElementById('progressQuiz').textContent = quiz.text;
+            document.getElementById('progressGloss').textContent = gloss.text;
+            document.getElementById('progressFlash').textContent = flash.text;
+            document.getElementById('progressStructures').textContent = structures.text;
+            document.getElementById('progressCases').textContent = cases.text;
+            document.getElementById('progressInteractive').textContent = interactive.text;
+            document.getElementById('progressMaps').textContent = maps.text;
+        }
+
+        loadFromLocal();
+
+        /* Navigation wiring */
+        const sections = document.querySelectorAll("section");
+        document.querySelectorAll(".btn").forEach(btn=> {
+            btn.classList.add("px-3", "py-1", "rounded", "bg-indigo-600", "text-white"); btn.addEventListener('click', ()=> {
+                sections.forEach(sec=>sec.classList.add('hidden-by-default')); document.getElementById(btn.dataset.target).classList.remove('hidden-by-default'); window.scrollTo({
+                    top: 0, behavior: 'smooth'
+                });
+            });
+        });
+
+        /* File import/export */
+        const fileInput = document.getElementById('fileInput');
+        document.querySelector('.btn-file').addEventListener('click', ()=> fileInput.click());
+        fileInput.addEventListener('change', handleFile, false);
+        document.getElementById('exportJSON').addEventListener('click', exportAll);
+
+        function handleFile(evt) {
+            const f = evt.target.files[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = e=> {
+                try {
+                    const obj = JSON.parse(e.target.result);
+                    // basic merge/replace: if keys present replace DB keys
+                    DB = Object.assign({}, DB, obj);
+                    ensureDbShape();
+                    renderAll();
+                    saveToLocal();
+                    alert('Contenido importado correctamente.');
+                } catch(err) {
+                    alert('Error leyendo JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(f);
+        }
+        function exportAll() {
+            const dataStr = JSON.stringify(DB, null, 2);
+            const blob = new Blob([dataStr], {
+                type: "application/json"
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'contenido_biologia_celular.json'; document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        /* CRUD simple for glosario, flashcards, etc. */
+        document.getElementById('addTerm').addEventListener('click', ()=> {
+            const t = document.getElementById('termInput').value.trim(); const d = document.getElementById('defInput').value.trim();
+            if (!t || !d) {
+                alert('Rellena término y definición'); return;
+            }
+            DB.glossary.unshift({
+                term: t, def: d
+            }); document.getElementById('termInput').value = ''; document.getElementById('defInput').value = ''; renderGloss(); saveToLocal();
+        });
+        document.getElementById('clearGloss').addEventListener('click', ()=> {
+            if (!confirm('Borrar todo el glosario?')) return; DB.glossary = []; renderGloss(); saveToLocal();
+        });
+        document.getElementById('importGloss').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('glossJSON').value); if (Array.isArray(arr)) {
+                    DB.glossary = arr;
+                    renderGloss();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Glosario importado');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportGloss').addEventListener('click', ()=> {
+            document.getElementById('glossJSON').value = JSON.stringify(DB.glossary, null, 2);
+        });
+
+        document.getElementById('loadFlash').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('flashJSON').value); if (Array.isArray(arr)) {
+                    DB.flashcards = arr;
+                    renderFlashcards();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Flashcards cargadas');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportFlash').addEventListener('click', ()=> {
+            document.getElementById('flashJSON').value = JSON.stringify(DB.flashcards, null, 2);
+        });
+
+        document.getElementById('loadStructures').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('structuresJSON').value); if (Array.isArray(arr)) {
+                    DB.structures = arr;
+                    renderStructures();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Estructuras cargadas');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportStructures').addEventListener('click', ()=> {
+            document.getElementById('structuresJSON').value = JSON.stringify(DB.structures, null, 2);
+        });
+
+        document.getElementById('loadCases').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('casesJSON').value); if (Array.isArray(arr)) {
+                    DB.cases = arr;
+                    renderCases();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Casos cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportCases').addEventListener('click', ()=> {
+            document.getElementById('casesJSON').value = JSON.stringify(DB.cases, null, 2);
+        });
+
+        document.getElementById('loadInter').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('interJSON').value); if (Array.isArray(arr)) {
+                    DB.interactives = arr;
+                    renderInteratives();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Interactivos cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportInter').addEventListener('click', ()=> {
+            document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2);
+        });
+
+        document.getElementById('loadMaps').addEventListener('click', ()=> {
+            try {
+                const obj = JSON.parse(document.getElementById('mapsJSON').value); if (typeof obj === 'object') {
+                    DB.maps = obj;
+                    renderMaps();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Mapas cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportMaps').addEventListener('click', ()=> {
+            document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
+        });
+
+        /* Quiz: sequential behavior */
+        let filteredQuestions = DB.questions.slice();
+        let qIndex = 0;
+        let currentQuestion = null;
+        function renderQuizTopics() {
+            const select = document.getElementById('quizTopic');
+            if (!select) return;
+            select.innerHTML = '';
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'Todos los bloques';
+            select.appendChild(allOption);
+            const topics = Array.isArray(DB.quizTopics) ? DB.quizTopics: [];
+            topics.forEach(topic => {
+                if (!topic || !topic.value) return;
+                const option = document.createElement('option');
+                option.value = topic.value;
+                option.textContent = topic.label || topic.value;
+                select.appendChild(option);
+            });
+        }
+        function refreshFiltered(topic) {
+            filteredQuestions = (topic && topic !== 'all') ? DB.questions.filter(q=> q.topic === topic): DB.questions.slice();
+            qIndex = 0;
+            document.getElementById('qTotal').textContent = filteredQuestions.length;
+            renderCurrentQuestion();
+        }
+        function renderCurrentQuestion() {
+            if (filteredQuestions.length === 0) {
+                document.getElementById('qText').textContent = 'No hay preguntas en este tema.'; document.getElementById('qOptions').innerHTML = ''; document.getElementById('qNumber').textContent = '0'; return;
+            }
+            if (qIndex < 0) qIndex = 0;
+            if (qIndex >= filteredQuestions.length) qIndex = filteredQuestions.length -1;
+            const q = filteredQuestions[qIndex];
+            document.getElementById('qText').textContent = q.text;
+            const opts = document.getElementById('qOptions'); opts.innerHTML = '';
+            const questionOptions = Array.isArray(q.options) ? q.options: [];
+            questionOptions.forEach((o, i)=> {
+                const label = document.createElement('label'); label.className = 'block'; label.innerHTML = `<input type="radio" name="qopt" value="${i}"> ${escapeHtml(o)}`; opts.appendChild(label);
+            });
+            document.getElementById('qNumber').textContent = (qIndex+1);
+            document.getElementById('qTotal').textContent = filteredQuestions.length;
+            currentQuestion = q;
+        }
+        document.getElementById('quizTopic').addEventListener('change', ()=> {
+            refreshFiltered(document.getElementById('quizTopic').value);
+        });
+        document.getElementById('nextQ').addEventListener('click', ()=> {
+            if (filteredQuestions.length === 0) {
+                alert('No hay preguntas.'); return;
+            } if (qIndex < filteredQuestions.length-1) qIndex++; renderCurrentQuestion();
+        });
+        document.getElementById('prevQ').addEventListener('click', ()=> {
+            if (filteredQuestions.length === 0) {
+                alert('No hay preguntas.'); return;
+            } if (qIndex > 0) qIndex--; renderCurrentQuestion();
+        });
+        document.getElementById('checkA').addEventListener('click', () => {
+            const sel = document.querySelector('input[name="qopt"]:checked');
+            const res = document.getElementById('qResult');
+
+            if (!currentQuestion) {
+                res.textContent = 'No hay pregunta seleccionada.';
+                return;
+            }
+
+            if (!sel) {
+                res.textContent = 'Selecciona una opción.';
+                return;
+            }
+
+            const itemId = currentQuestion.id || `quiz-${qIndex}`;
+
+            if (parseInt(sel.value) === currentQuestion.answer) {
+                res.textContent = '✅ Correcto. ' + (currentQuestion.explain || '');
+                markItem('quiz', itemId, true);
+            } else {
+                res.textContent = '❌ Incorrecto. ' + (currentQuestion.explain || '');
+                markItem('quiz', itemId, false);
+            }
+        });
+
+        document.getElementById('showAll').addEventListener('click', ()=> {
+            document.getElementById('questionsJSON').value = JSON.stringify(DB.questions, null, 2);
+        });
+
+        /* Load questions JSON editor */
+        document.getElementById('loadQuestions').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('questionsJSON').value); if (Array.isArray(arr)) {
+                    DB.questions = arr;
+                    refreshFiltered(document.getElementById('quizTopic').value);
+                    renderAll();
+                    saveToLocal();
+                    updateDashboard();
+                    alert('Preguntas cargadas');
+                } else alert('Formato inválido (se espera array).');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('loadQuizTopics').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('quizTopicsJSON').value);
+                if (Array.isArray(arr)) {
+                    DB.quizTopics = arr;
+                    renderQuizTopics();
+                    refreshFiltered(document.getElementById('quizTopic').value);
+                    saveToLocal();
+                    alert('Bloques del quiz cargados');
+                } else {
+                    alert('Formato inválido (se espera array).');
+                }
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportQuizTopics').addEventListener('click', ()=> {
+            document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+        });
+
+        /* Reset progress */
+        document.getElementById('reset').addEventListener('click', () => {
+            if (!confirm('Reiniciar todo el progreso?')) return;
+
+            localStorage.removeItem('progressBySection');
+            localStorage.removeItem('score');
+            localStorage.removeItem('block1');
+            localStorage.removeItem('block2');
+            localStorage.removeItem('block3');
+
+            updateDashboard();
+        });
+
+        /* initial render and quiz setup */
+        renderAll();
+        refreshFiltered('all');
+
+        /* =====================
+   HOME JSON (SOLO INICIO)
+   ===================== */
+
+        document.getElementById("loadHomeJSON").addEventListener("click", () => {
+            try {
+                const data = JSON.parse(document.getElementById("homeJSON").value);
+
+                if (data.title) {
+                    document.getElementById("homeTitle").textContent = data.title;
+                }
+                if (data.description) {
+                    document.getElementById("homeDescription").innerHTML = data.description;
+                }
+            } catch (e) {
+                alert("JSON inválido en Inicio");
+            }
+        });
+
+        document.getElementById("exportHomeJSON").addEventListener("click", () => {
+            const data = {
+                title: document.getElementById("homeTitle").textContent,
+                description: document.getElementById("homeDescription").innerHTML
+            };
+            document.getElementById("homeJSON").value = JSON.stringify(data, null, 2);
+        });
+    </script>
+</body>
+</html>
